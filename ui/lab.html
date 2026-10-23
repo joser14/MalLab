@@ -1034,7 +1034,8 @@ async function showRun(sid, rid) {
       ${d.vgpu_isolated === false ? `<div class="k">Isolation</div><div style="color:var(--red)"><b>The host GPU was visible inside the VM</b> (${esc((d.display_adapters || []).join(", "))}). GPU sharing is an escape surface${(d.isolation_failed || []).length ? ", so the sample was not run" : ""}.</div>`
         : d.vgpu_isolated ? `<div class="k">Isolation</div><div>GPU isolated (${esc((d.display_adapters || []).join(", "))})</div>` : ""}
       ${pcap ? `<div class="k">Capture</div><div><a href="${pcap}">Download capture.pcapng</a></div>` : ""}</div></div>
-    ${det.process_tree && det.process_tree.length ? sect("Process tree", true, ptree(det.process_tree)) : ""}
+    ${det.process_tree && det.process_tree.length ? sect("Behaviour graph", true, behaviourGraph(det.process_tree, d)) : ""}
+    ${det.process_tree && det.process_tree.length ? sect("Process tree", false, ptree(det.process_tree)) : ""}
     ${sect(`New processes <span class="badge">${(d.new_processes || []).length}</span>`, (d.new_processes || []).length > 0, list((d.new_processes || []).map((p) => `${p.name} (pid ${p.pid}) ${p.cmd || ""}`)))}
     ${(d.dropped || []).length ? sect(`Collected payloads <span class="badge">${d.dropped.length}</span>`, true, `<p class="small" style="margin-bottom:8px">Copied out of the VM and added to this case as samples (static triage only).</p><div class="tbl"><table><tbody>${d.dropped.map((x) => `<tr><td class="mono break">${esc(x.path)}</td><td>${fmtSize(x.size)}</td><td class="mono small">${esc(x.sha256.slice(0, 16))}…</td></tr>`).join("")}</tbody></table></div>`) : ""}
     ${d.memscan || d.memscan_error ? sect(`Memory scan <span class="badge">${(d.memory || []).length}</span>`, (d.memory || []).length > 0,
@@ -1081,6 +1082,66 @@ function sysmonHtml(d) {
       ${tbl(b.background.processes || [], [[(r) => r.name, "mono"], [(r) => r.cmd, "small mono break"]])}</details>` : ""}`);
 }
 const epHost = (ep) => { const e = String(ep).split(" ")[0]; return e.startsWith("[") ? e.slice(1).split("]")[0] : e.includes(":") ? e.slice(0, e.lastIndexOf(":")) : e; };
+// A compact SVG process+network graph: processes laid out as a tree (depth = column), with
+// network endpoints and DNS names as leaf nodes hanging off the process that reached them.
+function behaviourGraph(roots, d) {
+  const nodes = [], edges = [];
+  let row = 0;
+  const COLW = 210, ROWH = 46;
+  const procByPid = {};
+  // Lay out the process tree: y by a running leaf counter, x by depth; link parent→child as we go.
+  const place = (n, depth, parentNode) => {
+    const node = { id: "p" + nodes.length, x: depth, y: 0, kind: "proc", label: n.name || "?", sub: "pid " + (n.pid ?? "?"), cmd: n.cmd || "" };
+    nodes.push(node); if (n.pid != null) procByPid[n.pid] = node;
+    if (parentNode) edges.push([parentNode, node]);
+    const kids = n.children || [];
+    if (kids.length) { const ys = kids.map((k) => place(k, depth + 1, node)); node.y = (ys[0] + ys[ys.length - 1]) / 2; }
+    else { node.y = row++; }
+    return node.y;
+  };
+  roots.forEach((r) => place(r, 0, null));
+  let maxDepth = Math.max(0, ...nodes.map((n) => n.x));
+  // Network + DNS leaves.
+  const beh = d.behavior || {};
+  const netNodes = [];
+  (beh.network || []).forEach((n) => {
+    const host = n.dst_host || n.dst_ip; if (!host) return;
+    netNodes.push({ host: host + (n.dst_port ? ":" + n.dst_port : ""), pid: n.pid });
+  });
+  if (!netNodes.length) (d.network || []).forEach((ep) => netNodes.push({ host: epHost(ep), pid: null }));
+  const seenNet = new Set();
+  netNodes.forEach((nn) => {
+    if (seenNet.has(nn.host)) return; seenNet.add(nn.host);
+    const parent = (nn.pid != null && procByPid[nn.pid]) || nodes.find((x) => x.kind === "proc");
+    const node = { id: "n" + nodes.length, x: (parent ? parent.x : 0) + 1, y: row++, kind: "net", label: nn.host, sub: "network" };
+    if (node.x > maxDepth) maxDepth = node.x;
+    nodes.push(node); if (parent) edges.push([parent, node]);
+  });
+  (beh.dns || []).slice(0, 8).forEach((q) => {
+    if (!q.query || seenNet.has(q.query)) return; seenNet.add(q.query);
+    const parent = (q.pid != null && procByPid[q.pid]) || nodes.find((x) => x.kind === "proc");
+    const node = { id: "dns" + nodes.length, x: (parent ? parent.x : 0) + 1, y: row++, kind: "dns", label: q.query, sub: "DNS" };
+    if (node.x > maxDepth) maxDepth = node.x;
+    nodes.push(node); if (parent) edges.push([parent, node]);
+  });
+  if (!nodes.length) return `<div class="none">Nothing to graph.</div>`;
+  const W = (maxDepth + 1) * COLW + 20, H = Math.max(row, 1) * ROWH + 20;
+  const px = (n) => 12 + n.x * COLW, py = (n) => 20 + n.y * ROWH;
+  const colour = { proc: "var(--violet)", net: "var(--red)", dns: "var(--blue)" };
+  const edgeSvg = edges.map(([a, b]) => {
+    const x1 = px(a) + 150, y1 = py(a), x2 = px(b), y2 = py(b), mx = (x1 + x2) / 2;
+    return `<path d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="var(--line2)" stroke-width="1.5"/>`;
+  }).join("");
+  const nodeSvg = nodes.map((n) => `<g transform="translate(${px(n)},${py(n) - 15})">
+    <rect width="150" height="30" rx="7" fill="var(--surface)" stroke="${colour[n.kind]}" stroke-width="1.5"/>
+    <circle cx="11" cy="15" r="4" fill="${colour[n.kind]}"/>
+    <text x="22" y="13" font="11px var(--mono)" font-family="var(--mono)" font-size="11" fill="var(--text)">${esc(String(n.label).slice(0, 20))}</text>
+    <text x="22" y="24" font-family="var(--mono)" font-size="9" fill="var(--muted)">${esc(n.sub)}</text>
+    <title>${esc(n.label)}${n.cmd ? "\n" + esc(n.cmd.slice(0, 300)) : ""}</title></g>`).join("");
+  return `<div style="overflow:auto;max-width:100%"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 680)}px">
+    ${edgeSvg}${nodeSvg}</svg></div>
+    <div class="small" style="margin-top:6px"><span style="color:var(--violet)">●</span> process · <span style="color:var(--red)">●</span> network · <span style="color:var(--blue)">●</span> DNS · hover a node for its command line</div>`;
+}
 function ptree(roots) {
   const node = (n) => `<li><span class="mono">${esc(n.name || "?")}</span> <span class="small">pid ${esc(String(n.pid))}</span>${n.cmd ? `<div class="small mono break">${esc(String(n.cmd).slice(0, 220))}</div>` : ""}${(n.children || []).length ? `<ul>${n.children.map(node).join("")}</ul>` : ""}</li>`;
   return `<ul class="ptree">${roots.map(node).join("")}</ul>`;
