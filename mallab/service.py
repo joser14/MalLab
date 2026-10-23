@@ -723,8 +723,7 @@ class MalLab:
                 for member in z.namelist():
                     if member.lower().endswith("sysmon64.exe"):
                         (self.tools_dir / "Sysmon64.exe").write_bytes(z.read(member))
-        cfg = self.tools_dir / "sysmon-config.xml"
-        # Replace our own older default (it logged every DLL load); never touch a custom config.
+        # Write a default config, or replace our own older default; never touch a custom one.
         self._refresh_sysmon_config()
         self._emit(type="lab_log", text="Sysmon ready.")
         return self.sysmon_status()

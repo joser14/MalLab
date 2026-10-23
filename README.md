@@ -103,6 +103,27 @@ Engine modules:
 - **Sample Investigate tab**: related samples across the lab (imphash, TLSH, shared IOCs),
   suggested threat groups with the reason for each, and a YARA rule draft.
 - Analyst notes and labels on samples and groups.
+- **Verdict and threat score** per sample: every piece of evidence (static risk, behaviour
+  detections, threat intel, YARA/Sigma, memory implants, linked groups) fused into one answer,
+  a 0–100 score, a family name and a confidence level, with the reasons. Absence of evidence is
+  reported as *unknown*, never *clean*.
+- **Professional HTML report** (view or download; prints to PDF): executive summary with the
+  verdict up top, per-sample findings, detections mapped to ATT&CK, consolidated IOCs and
+  recommended actions. Markdown export is still available.
+- **Behaviour graph**: a process + network graph on each run, with network endpoints and DNS
+  names branching off the process that reached them.
+- **Sigma detections**: SigmaHQ's community rules run on each run's Sysmon events (the sample's
+  own process lineage only). Installed from Settings or by the installer.
+- **Memory scan**: hollows_hunter (pe-sieve) runs inside the sandbox after each run; injected or
+  unpacked code is dumped, added to the case as samples, and detected.
+- **YARA Forge rule pack** and **Retrohunt**: scan every sample already in the lab with any rule.
+  Packs are stored encoded because antivirus quarantines plain rule files.
+- **MISP push**: send a case's IOCs to your MISP instance as a tagged Event (Settings → MISP sharing).
+- **BLU MODE** (blue-team host observation): for incident responders on a dedicated analysis
+  machine with no Windows Sandbox. MalLab records what happens on the host over a window
+  (processes, files, registry, network, Sysmon) while *you* run the sample yourself; MalLab
+  executes nothing. Off by default; arming and each capture need a typed confirmation. Use it
+  only on a machine set aside for analysis, and reimage it afterward.
 
 ## Safety model
 

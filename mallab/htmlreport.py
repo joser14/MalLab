@@ -56,7 +56,7 @@ def build(case: dict, samples: list[dict], per_sample: list[dict], iocs: dict,
     """per_sample: [{sample, verdict, static, detections, runs:[dynamic...]}] aligned with samples."""
     when = time.strftime("%Y-%m-%d %H:%M %Z")
     parts = [_HEAD.replace("{title}", _e(case.get("name", "Case")))]
-    parts.append(f'<h1>Malware Analysis Report</h1>')
+    parts.append('<h1>Malware Analysis Report</h1>')
     parts.append(f'<div class="sub">{_e(case.get("name", ""))} · generated {_e(when)} · MalLab</div>')
 
     # Executive summary

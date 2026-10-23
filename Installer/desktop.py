@@ -15,7 +15,6 @@ The setup flags are what the installer runs for its optional steps; they exit wi
 
 import argparse
 import ctypes
-import os
 import sys
 import threading
 import time
