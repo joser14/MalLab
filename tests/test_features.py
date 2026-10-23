@@ -112,6 +112,7 @@ def test_catalog_import_is_merged_from_downloads(tmp_path, monkeypatch):
     assert res["created"] == 2 and not res["errors"]
     again = lab.import_actor_catalog()          # idempotent: nothing new the second time
     assert again["created"] == 0
+    assert (tmp_path / "intel" / "actors.version").exists()   # what the installer checks
 
 
 # ---- free IOC enrichment ----------------------------------------------------------------

@@ -133,3 +133,17 @@ def test_desktop_setup_flags_record_failures(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["MalLab.exe", "--lab-root", str(tmp_path / "lab"), "--setup-capa", "--import-actors"])
     assert desktop.main() == 1                       # capa failed, actors still ran
     assert (tmp_path / "lab" / "setup-pending.txt").read_text(encoding="utf-8").split() == ["capa"]
+
+
+def test_installer_detects_existing_installs_and_uninstall_restores_windows():
+    # The installer reads these exact markers to show a tool as already installed; the app must
+    # keep writing them where the installer looks.
+    iss = (Path(__file__).resolve().parent.parent / "Installer" / "MalLab.iss").read_text(encoding="utf-8")
+    for marker in ("Sysmon64.exe", "capa.exe", "fakenet.version", "hollows_hunter64.exe", "sigma.version",
+                   "yara_forge.version", "actors.version"):
+        assert marker in iss, marker
+    # Upgrades replace the old program files; uninstall undoes every system change MalLab makes.
+    assert '[InstallDelete]' in iss and '{app}\\_internal' in iss
+    assert "Remove-MpPreference" in iss and "Remove-NetFirewallRule" in iss
+    assert "defender-state.json" in iss and "netguard-state.json" in iss
+    assert "EnabledWindowsSandbox" in iss and "/disable-feature" in iss

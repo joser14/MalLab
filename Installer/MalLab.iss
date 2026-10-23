@@ -4,9 +4,11 @@
 ; Install: MalLab + WebView2 (if missing), and optionally Windows Sandbox, Sysmon, capa, FakeNet-NG,
 ; threat-group data, the host network guard, the Defender exclusion for the sample folders, and
 ; threat-intel API keys (user environment variables).
-; Uninstall: removes the app, shortcuts, the Defender exclusion and the host guard rules, then asks before deleting lab
-; data (it contains live samples) and saved API keys. Windows Sandbox stays enabled, since other
-; software may use it.
+; Upgrade: an installed older version's program files are removed first; lab data is kept. Tools and
+; protections already in place are shown as such and left unticked.
+; Uninstall: puts Windows back as it was: removes the app, shortcuts, every Defender exclusion and
+; firewall rule MalLab added, then asks before deleting lab data (it contains live samples) and saved
+; API keys, and, if this installer turned Windows Sandbox on, whether to turn it off again.
 
 #define MyAppName "MalLab"
 #define MyAppVersion "1.2.2"
@@ -60,6 +62,12 @@ Name: "hostguard"; Description: "Turn on the host network guard: block the sandb
 Name: "defender"; Description: "Exclude MalLab's sample folders from Microsoft Defender (Windows will ask you to approve)"; GroupDescription: "Protection:"; Flags: unchecked
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
+[InstallDelete]
+; Upgrading: remove the previous version's program files first, so nothing stale from an older
+; build is left behind. Lab data, tools and settings live in %LOCALAPPDATA%\MalLab and are kept.
+Type: filesandordirs; Name: "{app}\_internal"
+Type: files; Name: "{app}\{#MyAppExe}"
+
 [Files]
 Source: "dist\MalLab\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -94,10 +102,91 @@ const
   WebView2Url = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
   KeyCount = 5;
 
+  UninstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{6F3B1C52-8E4A-4C1D-9B7E-2A5D0F9C3E11}_is1';
+  MarkerKey = 'SOFTWARE\MalLab';
+
 var
   DownloadPage: TDownloadWizardPage;
   KeysPage: TInputQueryWizardPage;
   SandboxEnabledNow: Boolean;
+  PrevVersion: String;
+  HaveSysmon, HaveCapa, HaveFakenet, HaveMemscan, HaveSigma, HaveYaraForge, HaveActors: Boolean;
+  GuardOn, ExclusionOn, TasksMarked: Boolean;
+
+{ ---- lab paths (the signed-in user's %LOCALAPPDATA%, as the app uses) ---- }
+
+function LabDir: String;
+begin
+  Result := ExpandConstant('{localappdata}\MalLab\lab');
+end;
+
+function PSQuote(S: String): String;
+begin
+  StringChangeEx(S, '''', '''''', True);
+  Result := '''' + S + '''';
+end;
+
+function RunPS(const Script: String): Boolean;
+var
+  Code: Integer;
+begin
+  Result := Exec('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + Script + '"',
+                 '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+end;
+
+{ ---- what is already installed ---- }
+
+procedure DetectInstalled;
+var
+  Tools: String;
+begin
+  if not RegQueryStringValue(HKLM, UninstallKey, 'DisplayVersion', PrevVersion) then
+    PrevVersion := '';
+  Tools := LabDir + '\tools\';
+  HaveSysmon := FileExists(Tools + 'Sysmon64.exe');
+  HaveCapa := FileExists(Tools + 'capa.exe');
+  HaveFakenet := FileExists(Tools + 'fakenet.version');
+  HaveMemscan := FileExists(Tools + 'hollows_hunter64.exe');
+  HaveSigma := FileExists(Tools + 'sigma.version');
+  HaveYaraForge := FileExists(Tools + 'yara_forge.version');
+  HaveActors := FileExists(LabDir + '\intel\actors.version');
+  { Read live from Windows, not from MalLab's own notes: all four guard rules enabled, and both
+    sample folders excluded (Get-MpPreference needs admin, which setup has). }
+  GuardOn := RunPS('if (@(Get-NetFirewallRule -Group ''MalLab host guard'' -ErrorAction SilentlyContinue | ' +
+                   'Where-Object { $_.Enabled -eq ''True'' }).Count -ge 4) { exit 0 } else { exit 1 }');
+  ExclusionOn := RunPS('$ex = @((Get-MpPreference).ExclusionPath); ' +
+                       'if (($ex -contains ' + PSQuote(LabDir + '\quarantine') + ') -and ($ex -contains ' +
+                       PSQuote(LabDir + '\runs') + ')) { exit 0 } else { exit 1 }');
+end;
+
+{ Untick a task that is already done and say so; ticking it again updates or re-applies it. }
+procedure MarkTask(const Prefix, Note: String; Done: Boolean);
+var
+  I: Integer;
+begin
+  if not Done then Exit;
+  for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+    if Pos(Prefix, WizardForm.TasksList.ItemCaption[I]) = 1 then
+    begin
+      WizardForm.TasksList.ItemCaption[I] := WizardForm.TasksList.ItemCaption[I] + Note;
+      WizardForm.TasksList.Checked[I] := False;
+    end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID <> wpSelectTasks) or TasksMarked then Exit;
+  TasksMarked := True;
+  MarkTask('Sysmon', '  (already installed; tick to update)', HaveSysmon);
+  MarkTask('capa', '  (already installed; tick to update)', HaveCapa);
+  MarkTask('FakeNet-NG', '  (already installed; tick to update)', HaveFakenet);
+  MarkTask('hollows_hunter', '  (already installed; tick to update)', HaveMemscan);
+  MarkTask('SigmaHQ', '  (already installed; tick to update)', HaveSigma);
+  MarkTask('YARA Forge', '  (already installed; tick to update)', HaveYaraForge);
+  MarkTask('Threat-group data', '  (already imported; tick to refresh)', HaveActors);
+  MarkTask('Turn on the host network guard', '  (already on)', GuardOn);
+  MarkTask('Exclude MalLab', '  (already set)', ExclusionOn);
+end;
 
 function KeyName(I: Integer): String;
 begin
@@ -172,6 +261,7 @@ procedure InitializeWizard;
 var
   I: Integer;
 begin
+  DetectInstalled;
   DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), @OnDownloadProgress);
   KeysPage := CreateInputQueryPage(wpSelectTasks,
     'Threat-intel API keys (optional)',
@@ -217,6 +307,9 @@ var
   I, N: Integer;
 begin
   Result := MemoDirInfo + NewLine + NewLine;
+  if PrevVersion <> '' then
+    Result := Result + 'Upgrade:' + NewLine + Space + 'MalLab ' + PrevVersion + ' is removed and replaced by ' +
+              '{#MyAppVersion}. Your cases, samples, tools and settings are kept.' + NewLine + NewLine;
   if not WebView2Installed then
     Result := Result + 'Prerequisites:' + NewLine + Space + 'Microsoft Edge WebView2 Runtime (download)' + NewLine + NewLine;
   if MemoTasksInfo <> '' then
@@ -256,7 +349,11 @@ begin
   if Exec(ExpandConstant('{sys}\dism.exe'),
           '/online /enable-feature /featurename:Containers-DisposableClientVM /all /norestart /quiet',
           '', SW_HIDE, ewWaitUntilTerminated, Code) and ((Code = 0) or (Code = 3010)) then
-    SandboxEnabledNow := True
+  begin
+    SandboxEnabledNow := True;
+    { remembered so the uninstaller can offer to turn it back off }
+    RegWriteDWordValue(HKLM, MarkerKey, 'EnabledWindowsSandbox', 1);
+  end
   else
     SuppressibleMsgBox('Windows Sandbox could not be turned on (DISM code ' + IntToStr(Code) + ').' + #13#10#13#10 +
       'Make sure virtualization (Intel VT-x / AMD-V) is enabled in the BIOS/UEFI, then run this in an ' +
@@ -301,24 +398,36 @@ begin
   Result := ExpandConstant('{localappdata}\MalLab');
 end;
 
+{ Puts Windows back the way it was before MalLab: every Defender exclusion MalLab added (matched by
+  its folder names, so one added for an older or relocated lab folder goes too), the host guard's
+  firewall rules, and MalLab's notes of them, so a later reinstall doesn't think they're still set. }
 procedure RemoveDefenderExclusion;
-var
-  Code: Integer;
-  Lab: String;
 begin
-  Lab := LabDataDir + '\lab';
-  Exec('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
-       'Remove-MpPreference -ExclusionPath ''' + Lab + '\quarantine'',''' + Lab + '\runs'' -ErrorAction SilentlyContinue"',
-       '', SW_HIDE, ewWaitUntilTerminated, Code);
+  RunPS('$ex = @((Get-MpPreference).ExclusionPath | Where-Object { $_ -match ''\\MalLab\\lab\\(quarantine|runs)\\?$'' }); ' +
+        'if ($ex.Count) { Remove-MpPreference -ExclusionPath $ex }');
+  DeleteFile(LabDataDir + '\lab\tools\defender-state.json');
 end;
 
 procedure RemoveHostGuard;
+begin
+  RunPS('Get-NetFirewallRule -Group ''MalLab host guard'' -ErrorAction SilentlyContinue | Remove-NetFirewallRule');
+  DeleteFile(LabDataDir + '\lab\tools\netguard-state.json');
+end;
+
+{ Windows Sandbox is only offered for removal when this installer turned it on. }
+procedure OfferSandboxRevert;
 var
+  Flag: Cardinal;
   Code: Integer;
 begin
-  Exec('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' +
-       'Get-NetFirewallRule -Group ''MalLab host guard'' -ErrorAction SilentlyContinue | Remove-NetFirewallRule"',
-       '', SW_HIDE, ewWaitUntilTerminated, Code);
+  if not (RegQueryDWordValue(HKLM, MarkerKey, 'EnabledWindowsSandbox', Flag) and (Flag = 1)) then Exit;
+  if SuppressibleMsgBox('MalLab turned on Windows Sandbox when it was installed.' + #13#10#13#10 +
+       'Turn Windows Sandbox off again? (A restart finishes it. Choose No if anything else uses it.)',
+       mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
+    Exec(ExpandConstant('{sys}\dism.exe'),
+         '/online /disable-feature /featurename:Containers-DisposableClientVM /norestart /quiet',
+         '', SW_HIDE, ewWaitUntilTerminated, Code);
+  RegDeleteKeyIncludingSubkeys(HKLM, MarkerKey);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -344,5 +453,6 @@ begin
          mbConfirmation, MB_YESNO, IDNO) = IDYES) then
       for I := 0 to KeyCount - 1 do
         RegDeleteValue(HKCU, 'Environment', KeyName(I));
+    OfferSandboxRevert;
   end;
 end;

@@ -979,6 +979,9 @@ class MalLab:
             self.store.create_actor(**f)
         res = {"created": len(creates), "updated": len(updates), "sources": sorted(got), "errors": errors,
                "total": len(self.store.list_actors())}
+        # Lets the installer see the catalog is already imported (it can't read the database).
+        self.intel_dir.mkdir(parents=True, exist_ok=True)
+        (self.intel_dir / "actors.version").write_text(time.strftime("%Y-%m-%d"), encoding="utf-8")
         self._emit(type="lab_log", text=f"Threat groups: {res['created']} added, {res['updated']} updated "
                                         f"from {', '.join(res['sources'])}" + (f" (failed: {'; '.join(errors)})" if errors else ""))
         return res

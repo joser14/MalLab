@@ -19,6 +19,10 @@ virtualization enabled; on Windows Home, everything except detonation works.
 - A one-time safety warning before the first detonation or sample opened in the sandbox: VM-escape
   risk, network modes, and never opening quarantined files on this PC. It must be ticked and
   accepted, and is remembered afterwards.
+- Setup detects what's already installed (tools, threat-group data, host guard, Defender
+  exclusion) and leaves it unticked, and upgrades cleanly over an older version, keeping your lab.
+- Uninstalling restores Windows: every Defender exclusion and firewall rule MalLab added is removed,
+  and if setup turned Windows Sandbox on, you're asked whether to turn it off again.
 
 ### Highlights
 

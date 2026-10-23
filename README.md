@@ -64,9 +64,14 @@ during setup (Sysmon's licence doesn't allow bundling it; GitHub tools arrive at
 over HTTPS, checked against GitHub's SHA-256 when the release publishes one). Any step that fails is
 listed in Settings with a retry button, where every tool can also be downloaded or updated later.
 
+Setup checks what's already there: tools that are installed and protections that are already on
+show as such and are left unticked (tick one to update it). Installing over an older version
+removes the old program files first and keeps your lab data, tools and settings.
+
 MalLab then runs as a desktop app in its own window, with a Start-menu entry and an uninstaller in
-Settings > Apps. Lab data lives in `%LOCALAPPDATA%\MalLab`. The uninstaller removes the Defender
-exclusion and the host guard rules, and asks before deleting lab data or API keys.
+Settings > Apps. Lab data lives in `%LOCALAPPDATA%\MalLab`. Uninstalling puts Windows back as it
+was: it removes every Defender exclusion and firewall rule MalLab added, asks before deleting lab
+data or API keys, and, if setup turned Windows Sandbox on, asks whether to turn it off again.
 
 ### Build the installer yourself
 
