@@ -11,7 +11,7 @@ from starlette.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import server
-from mallab import MalLab, actors, ioc_intel, sandbox, signatures, yara_rules
+from mallab import MalLab, actors, ioc_intel, sandbox, signatures
 
 
 # ---- interactive sandbox keeps the protections ------------------------------------------

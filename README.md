@@ -6,7 +6,8 @@ against threat-intel sources. Nothing runs on the host.
 
 ## Download and install
 
-1. Open the repository's **Releases** page and download the latest `MalLab-Setup-<version>.exe`.
+1. Download the latest `MalLab-Setup-<version>.exe` from the
+   [Releases page](https://github.com/joser14/MalLab/releases/latest).
 2. Run it and follow the wizard. It installs everything MalLab needs (no Python required) and
    offers to turn on Windows Sandbox and download the analysis tools.
 3. Windows may show **"Windows protected your PC"**, because the installer isn't code-signed.
@@ -50,48 +51,33 @@ MalLab.bat
 `MalLab.bat` starts `server.py` and opens http://127.0.0.1:7860. Options:
 `python server.py --port 7861 --lab-root D:\other\lab --no-browser`.
 
-### Installer
-
-`powershell -ExecutionPolicy Bypass -File Installer\build.ps1` builds `MalLab.exe` (YARA, the built-in
-similarity matching and everything else bundled, no Python needed; TLSH too where `py-tlsh` has a
-prebuilt wheel for the build's Python) and `Installer\Output\MalLab-Setup-<ver>.exe`.
-The installer offers, each as a checkbox: Windows Sandbox, Sysmon, capa, FakeNet-NG, threat-group
-data, the host network guard and the Defender exclusion. Tools are downloaded from their official
-sources during setup (Sysmon's licence doesn't allow bundling it; capa and FakeNet arrive at their latest
-GitHub release over HTTPS, checked against GitHub's SHA-256 when the release publishes one; capa's
-does, FakeNet-NG's current release predates that). Any step that fails is listed in Settings with a retry button,
-where every tool can also be downloaded or updated later.
-
-### Publishing a release (maintainers)
-
-Releases are built by GitHub Actions (`.github/workflows/release.yml`), not by hand:
-
-1. Bump `MyAppVersion` in `Installer/MalLab.iss` and the version in `Installer/version_info.txt`, commit.
-2. Tag and push: `git tag v1.2.3` then `git push origin v1.2.3`.
-
-The workflow checks the tag matches the app version, runs the tests, builds the installer on a
-clean Windows machine, and publishes it on the Releases page with `SHA256SUMS.txt`. To test a build
-without releasing, run the workflow manually from the Actions tab; the installer is attached to the
-run as an artifact.
-
 The server only answers requests from this computer: other machines, DNS-rebinding hosts and
 cross-site web pages are refused.
 
-## Build the installer
+### What the installer does
+
+It installs the WebView2 runtime if it is missing, then offers each of these as a checkbox: Windows
+Sandbox (restart needed; not available on Windows Home), Sysmon, capa, FakeNet-NG, hollows_hunter,
+SigmaHQ rules, YARA Forge rules, threat-group data, the host network guard and the Defender
+exclusion. It can also save threat-intel API keys. Tools are downloaded from their official sources
+during setup (Sysmon's licence doesn't allow bundling it; GitHub tools arrive at their latest release
+over HTTPS, checked against GitHub's SHA-256 when the release publishes one). Any step that fails is
+listed in Settings with a retry button, where every tool can also be downloaded or updated later.
+
+MalLab then runs as a desktop app in its own window, with a Start-menu entry and an uninstaller in
+Settings > Apps. Lab data lives in `%LOCALAPPDATA%\MalLab`. The uninstaller removes the Defender
+exclusion and the host guard rules, and asks before deleting lab data or API keys.
+
+### Build the installer yourself
 
 ```
 powershell -ExecutionPolicy Bypass -File Installer\build.ps1
 ```
 
-Produces `Installer\Output\MalLab-Setup-<version>.exe`, a normal Windows installer for people
-without Python. MalLab then runs as a desktop app in its own window (no browser), with a
-Start-menu entry and an uninstaller in Settings > Apps. Needs Python 3.11+ and Inno Setup 6
-(`winget install JRSoftware.InnoSetup`). `-SkipInstaller` builds only `Installer\dist\MalLab\`.
-
-The installer installs the WebView2 runtime if it is missing, and offers to turn on Windows
-Sandbox (restart needed; not available on Windows Home), download Sysmon, add the Defender
-exclusion, and save API keys. The installed app keeps lab data in `%LOCALAPPDATA%\MalLab`. The
-uninstaller removes the Defender exclusion and asks before deleting lab data or API keys.
+Builds `MalLab.exe` (YARA and everything else bundled; TLSH too where `py-tlsh` has a prebuilt wheel
+for the build's Python) and `Installer\Output\MalLab-Setup-<version>.exe`. Needs Python 3.11+ and
+Inno Setup 6 (`winget install JRSoftware.InnoSetup`). `-SkipInstaller` builds only
+`Installer\dist\MalLab\`.
 
 | Path | What it is |
 |---|---|
@@ -100,7 +86,18 @@ uninstaller removes the Defender exclusion and asks before deleting lab data or 
 | `Installer\MalLab.iss` | Inno Setup installer / uninstaller, prerequisite checks |
 | `Installer\build.ps1` | Builds both, in its own venv |
 
-Bump the version in `MalLab.iss` and `version_info.txt` together.
+### Publishing a release (maintainers)
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`), not by hand:
+
+1. Bump `MyAppVersion` in `Installer/MalLab.iss` and the version in `Installer/version_info.txt`.
+2. Write what changed in `RELEASE_NOTES.md` (it becomes the top of the release page). Commit.
+3. Tag and push: `git tag -a v1.2.3 -m "MalLab 1.2.3"` then `git push origin v1.2.3`.
+
+The workflow checks the tag matches the app version, runs the tests, builds the installer on a
+clean Windows machine, and publishes it on the Releases page with `SHA256SUMS.txt`. To test a build
+without releasing, run the workflow manually from the Actions tab; the installer is attached to the
+run as an artifact.
 
 ## What's here
 
@@ -175,6 +172,8 @@ Engine modules:
 
 ## Safety model
 
+- Before the first detonation, MalLab shows a one-time safety warning (VM-escape risk, networking,
+  never opening quarantined files on the host) that has to be ticked and accepted.
 - Samples are stored by hash as `sample.bin`, never under their real name or extension.
 - They only execute inside Windows Sandbox. Enable it once (admin PowerShell, then reboot):
   `Enable-WindowsOptionalFeature -FeatureName "Containers-DisposableClientVM" -Online`
@@ -245,3 +244,16 @@ Set in Settings (kept in memory) or as environment variables to persist:
 IOC enrichment and the threat-group import work without any key. A free abuse.ch key adds
 ThreatFox and URLhaus. Looking up an indicator tells that service you're interested in it; samples
 are never uploaded.
+
+## Responsible use
+
+MalLab is for defenders: malware analysts, incident responders, researchers and students. Only
+analyse samples you are authorised to handle, and follow your organisation's rules and local law.
+Live malware is dangerous even inside a sandbox; for targeted or high-risk samples, use a dedicated
+analysis machine. The software is provided as is, without warranty (see [LICENSE](LICENSE)).
+
+## Licence
+
+MIT. Bundled fonts (Inter, JetBrains Mono, Space Grotesk) are under the SIL Open Font License; see
+`ui/fonts/`. Tools downloaded at setup (Sysmon, capa, FakeNet-NG, hollows_hunter, SigmaHQ rules,
+YARA Forge) keep their own licences.

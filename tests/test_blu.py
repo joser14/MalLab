@@ -3,7 +3,6 @@ executes a sample, and that it is gated behind an explicit armed flag plus a typ
 No host observation is actually started here (that would run PowerShell); the gate and report
 shaping are tested directly."""
 
-import json
 import sys
 from pathlib import Path
 

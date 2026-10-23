@@ -13,7 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from mallab import MalLab, sandbox, signatures, sigma, static, sysmon, tooling
+from mallab import MalLab, sandbox, signatures, sigma, sysmon, tooling
 
 RULE_ENC = """
 title: Suspicious Encoded PowerShell Command Line
