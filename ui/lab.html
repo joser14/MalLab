@@ -1455,6 +1455,14 @@ async function viewSettings() {
       <div class="row end" style="margin-top:16px"><button class="primary" id="k-save">Save keys</button></div>
     </div></section>
 
+  <section class="set"><div><h2>MISP sharing</h2><p class="sub">Push a case's IOCs to your MISP instance as an Event, tagged with family, ATT&amp;CK and verdict. Only indicators are sent, never samples.</p></div>
+    <div>
+      <div class="field"><label for="k-mispurl">MISP URL ${LAB.misp && LAB.misp.configured ? `<span class="badge ok">Configured</span>` : `<span class="badge">Not set</span>`}</label><input id="k-mispurl" value="${esc((LAB.misp || {}).url || "")}" placeholder="https://misp.example.org"></div>
+      <div class="field"><label for="k-misp">Automation key</label><input type="password" id="k-misp" placeholder="MISP_API_KEY" autocomplete="off"></div>
+      <div class="field"><label style="cursor:pointer">${sw("k-mispverify", !(LAB.misp && LAB.misp.verify === false))} Verify the server's TLS certificate <span class="small">(turn off only for a self-signed MISP)</span></label></div>
+      <div class="row end" style="margin-top:16px"><button class="primary" id="k-misp-save">Save</button></div>
+    </div></section>
+
   <section class="set"><div><h2>Sample repository</h2><p class="sub">virus.exchange, vx-underground's sample database, for fetching and searching by hash.</p></div>
     <div>
       <div class="field"><label for="k-vxurl">API URL</label><input id="k-vxurl" value="${esc(LAB.repo_url || "")}" placeholder="https://virus.exchange/api"></div>
@@ -1489,6 +1497,13 @@ async function viewSettings() {
     toast("Saved"); viewSettings();
   };
   $("k-save").onclick = () => saveKeys({ vt_key: $("k-vt").value, abusech_key: $("k-abusech").value, ha_key: $("k-ha").value, otx_key: $("k-otx").value }, $("k-save"));
+  $("k-misp-save").onclick = async () => {
+    const body = { misp_url: $("k-mispurl").value.trim(), misp_key: $("k-misp").value, misp_verify: $("k-mispverify").checked };
+    if (!body.misp_url && !body.misp_key) return toast("Enter the MISP URL and key first.", true);
+    $("k-misp-save").disabled = true; const r = await api("/api/lab/config", body); $("k-misp-save").disabled = false;
+    if (r.error) return toast(r.error, true);
+    toast("MISP settings saved"); viewSettings();
+  };
   $("k-vx-save").onclick = () => saveKeys({ vx_url: $("k-vxurl").value.trim(), vx_key: $("k-vx").value }, $("k-vx-save"));
   $("sm-go").onclick = async () => {
     $("sm-go").disabled = true; $("sm-go").innerHTML = `<span class="spin"></span> Downloading`;
