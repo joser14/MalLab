@@ -108,9 +108,9 @@ SYSMON_EVENTS = [
                                      "ProcessGuid": "g11", "ParentProcessGuid": "g10", "CommandLine": "cmd /c whoami"}},
     {"id": 3, "time": "t", "data": {"ProcessId": "10", "Image": "C:\\in\\sample.exe", "DestinationIp": "203.0.113.5",
                                      "DestinationPort": "443", "DestinationHostname": ""}},
-    {"id": 10, "time": "t", "data": {"SourceImage": "C:\\in\\sample.exe", "TargetImage": "C:\\Windows\\System32\\lsass.exe",
-                                      "GrantedAccess": "0x1010"}},
-    {"id": 8, "time": "t", "data": {"SourceImage": "C:\\in\\sample.exe", "TargetImage": "C:\\Windows\\explorer.exe"}},
+    {"id": 10, "time": "t", "data": {"SourceImage": "C:\\in\\sample.exe", "SourceProcessId": "10",
+                                      "TargetImage": "C:\\Windows\\System32\\lsass.exe", "GrantedAccess": "0x1010"}},
+    {"id": 8, "time": "t", "data": {"SourceImage": "C:\\in\\sample.exe", "SourceProcessId": "10", "TargetImage": "C:\\Windows\\explorer.exe"}},
     {"id": 3, "time": "t", "data": {"ProcessId": "7", "Image": "powershell.exe", "DestinationIp": "1.1.1.1"}},  # monitor itself
 ]
 

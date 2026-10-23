@@ -83,7 +83,7 @@ def defang(v: str) -> str:
 # (An empty "exclude" logs everything; an empty "include" logs nothing.) ImageLoad is off
 # because every DLL load would bury the interesting events; process access is limited to
 # LSASS (credential dumping).
-_DEFAULT_SYSMON_CONFIG = """<!-- mallab default -->
+_DEFAULT_SYSMON_CONFIG = r"""<!-- mallab default -->
 <Sysmon schemaversion="4.90">
   <EventFiltering>
     <ProcessCreate onmatch="exclude"></ProcessCreate>
@@ -91,7 +91,20 @@ _DEFAULT_SYSMON_CONFIG = """<!-- mallab default -->
     <ImageLoad onmatch="include"></ImageLoad>
     <CreateRemoteThread onmatch="exclude"></CreateRemoteThread>
     <ProcessAccess onmatch="include"><TargetImage condition="end with">lsass.exe</TargetImage></ProcessAccess>
-    <RegistryEvent onmatch="exclude"></RegistryEvent>
+    <RegistryEvent onmatch="include">
+      <TargetObject condition="contains">\CurrentVersion\Run</TargetObject>
+      <TargetObject condition="contains">\CurrentVersion\Policies\Explorer\Run</TargetObject>
+      <TargetObject condition="contains">\CurrentControlSet\Services\</TargetObject>
+      <TargetObject condition="contains">\Winlogon\</TargetObject>
+      <TargetObject condition="contains">\Image File Execution Options\</TargetObject>
+      <TargetObject condition="contains">\Windows Defender\</TargetObject>
+      <TargetObject condition="contains">\Explorer\Shell Folders</TargetObject>
+      <TargetObject condition="contains">\Classes\CLSID\</TargetObject>
+      <TargetObject condition="contains">\Environment\</TargetObject>
+      <TargetObject condition="contains">\Schedule\TaskCache\</TargetObject>
+      <TargetObject condition="contains">\AppInit_DLLs</TargetObject>
+      <TargetObject condition="end with">\Shell\Open\Command\(Default)</TargetObject>
+    </RegistryEvent>
     <FileCreate onmatch="exclude"></FileCreate>
     <FileDeleteDetected onmatch="exclude"></FileDeleteDetected>
     <DnsQuery onmatch="exclude"></DnsQuery>
@@ -118,6 +131,10 @@ class MalLab:
         self.detonate_lock = threading.Lock()  # one sandbox VM at a time
         self.detonating = False
         yara_rules.ensure_starter(self.yara_dir)  # ship a starter ruleset on first run
+        try:
+            self._refresh_sysmon_config()             # upgrades an older MalLab default in place
+        except OSError:
+            pass
 
     def _emit(self, **ev):
         self.emit({"session": "lab", **ev})
@@ -515,6 +532,17 @@ class MalLab:
         self._emit(type="lab_log", text=f"{name} {res['version']} installed.")
         return res
 
+    def _refresh_sysmon_config(self):
+        """Write the default Sysmon config if there is none, and replace older MalLab defaults
+        (the first logged every DLL load; later ones logged every registry write, which filled
+        the event cap). A config the analyst wrote is never touched."""
+        cfg = self.tools_dir / "sysmon-config.xml"
+        old = cfg.read_text(encoding="utf-8", errors="replace") if cfg.exists() else ""
+        ours = old.lstrip().startswith("<!-- mallab default -->") or (
+            '<ImageLoad onmatch="exclude"></ImageLoad>' in old and '<ProcessAccess onmatch="exclude"></ProcessAccess>' in old)
+        if (not old and (self.tools_dir / "Sysmon64.exe").exists()) or (ours and old != _DEFAULT_SYSMON_CONFIG):
+            cfg.write_text(_DEFAULT_SYSMON_CONFIG, encoding="utf-8")
+
     def setup_sysmon(self) -> dict:
         """Download Sysmon from Microsoft Sysinternals into the lab's tools dir (explicit action).
         Also writes a compact default config if none is present."""
@@ -532,10 +560,7 @@ class MalLab:
                         (self.tools_dir / "Sysmon64.exe").write_bytes(z.read(member))
         cfg = self.tools_dir / "sysmon-config.xml"
         # Replace our own older default (it logged every DLL load); never touch a custom config.
-        old = cfg.read_text(encoding="utf-8", errors="replace") if cfg.exists() else ""
-        if not old or ('<ImageLoad onmatch="exclude"></ImageLoad>' in old
-                       and '<ProcessAccess onmatch="exclude"></ProcessAccess>' in old):
-            cfg.write_text(_DEFAULT_SYSMON_CONFIG, encoding="utf-8")
+        self._refresh_sysmon_config()
         self._emit(type="lab_log", text="Sysmon ready.")
         return self.sysmon_status()
 

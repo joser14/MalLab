@@ -219,10 +219,10 @@ $report.dns             = @(Get-DnsClientCache -ErrorAction SilentlyContinue |
 # child sample. Capped by count and size; the host re-hashes and re-validates everything.
 $dropDir = Join-Path $outDir "dropped"
 $dropped = @(); $dropTotal = 0
-$ordered = @($report.new_files | Sort-Object { if ($_ -match '\.(exe|dll|scr|sys|ps1|vbs|js|jse|wsf|bat|cmd|hta|lnk|jar|msi)$') { 0 } else { 1 } })
+$ordered = @($report.new_files | Select-Object -Unique | Sort-Object { if ($_ -match '\.(exe|dll|scr|sys|ps1|vbs|js|jse|wsf|bat|cmd|hta|lnk|jar|msi)$') { 0 } else { 1 } })
 foreach ($f in $ordered) {
     if ($dropped.Count -ge 25) { break }
-    if ($f -match '\\(D3DSCache|DXCache|DxCache|ShaderCache|Caches|ModuleAnalysisCache|thumbcache|iconcache)') { continue }
+    if ($f -match '\\(D3DSCache|DXCache|DxCache|ShaderCache|Caches|ModuleAnalysisCache|thumbcache|iconcache|EBWebView|WebCache|INetCache)\\|\\Packages\\MicrosoftWindows\.Client\.') { continue }
     $item = Get-Item -LiteralPath $f -ErrorAction SilentlyContinue
     if (-not $item -or $item.PSIsContainer -or $item.Length -eq 0 -or $item.Length -gt 20MB -or ($dropTotal + $item.Length) -gt 100MB) { continue }
     if (-not (Test-Path $dropDir)) { New-Item -ItemType Directory -Path $dropDir | Out-Null }
@@ -250,7 +250,7 @@ if ($report.pcap_started) {
 if ($report.sysmon) {
     try {
         $events = @(Get-WinEvent -FilterHashtable @{ LogName = "Microsoft-Windows-Sysmon/Operational"; StartTime = $detTime } `
-                        -MaxEvents 3000 -Oldest -ErrorAction SilentlyContinue | ForEach-Object {
+                        -MaxEvents 20000 -Oldest -ErrorAction SilentlyContinue | ForEach-Object {
             $d = @{}
             foreach ($n in ([xml]$_.ToXml()).Event.EventData.Data) { $d[$n.Name] = [string]$n.'#text' }
             @{ id = $_.Id; time = $_.TimeCreated.ToString("o"); data = $d } })
@@ -308,7 +308,9 @@ WSB_TEMPLATE = """<Configuration>
 # Files every fresh sandbox writes on its own (shader/thumbnail/module caches): not sample activity.
 NOISE_FILES = re.compile(r"\\(D3DSCache|NVIDIA\\DXCache|AMD\\DxCache|Intel\\ShaderCache"
                          r"|Microsoft\\Windows\\Caches|PowerShell\\ModuleAnalysisCache"
-                         r"|Microsoft\\Windows\\Explorer\\(thumbcache|iconcache))", re.I)
+                         r"|Microsoft\\Windows\\Explorer\\(thumbcache|iconcache)"
+                         r"|Packages\\MicrosoftWindows\.Client\.[^\\]+\\|EBWebView\\"   # Windows shell's WebView cache
+                         r"|Microsoft\\Windows\\(WebCache|INetCache|Notifications)\\)", re.I)
 BASIC_DISPLAY = re.compile(r"Basic Display|Basic Render|Remote Display|Hyper-V Video", re.I)
 
 
@@ -563,8 +565,34 @@ def detonate(sample_bytes: bytes, original_name: str, runs_root: Path, *,
     if report.get("sysmon_events"):
         report["behavior"] = sysmon.parse(report["sysmon_events"], report.get("monitor_pid"),
                                           report.get("launcher_pid"))
+        # The parsed behaviour is what's used; keep a slice of the raw events for reference
+        # instead of storing (and sending to the UI) up to 20,000 of them on every load.
+        report["sysmon_events"] = report["sysmon_events"][:200]
+    _keep_lineage(report)
     report["verdict"] = _summarize(report)
     return report
+
+
+def _keep_lineage(report: dict):
+    """With a known Sysmon lineage, keep only what the sample's process tree did: snapshot
+    processes it started and dropped files it created. Windows' own background activity in the
+    VM moves to background_* so it's visible but never counted or added to the case. Without
+    Sysmon, the noise filter is all there is."""
+    beh = report.get("behavior") or {}
+    blobs = report.get("_dropped_blobs") or []
+    mine_files = sysmon.lineage_files(beh)
+    if mine_files is not None:
+        pids = {p.get("pid") for p in beh.get("processes") or []}
+        procs = report.get("new_processes") or []
+        report["new_processes"] = [p for p in procs if p.get("pid") in pids]
+        report["background_processes"] = [p for p in procs if p.get("pid") not in pids]
+        keep = [i for i, (path, _) in enumerate(blobs) if path.lower() in mine_files]
+    else:
+        keep = [i for i, (path, _) in enumerate(blobs) if not NOISE_FILES.search(path)]
+    meta = report.get("dropped") or []
+    if len(meta) == len(blobs):
+        report["dropped"] = [meta[i] for i in keep]
+    report["_dropped_blobs"] = [blobs[i] for i in keep]
 
 
 MAX_OUTPUT_BYTES = 2 * 2**30          # whole shared output folder
@@ -622,11 +650,15 @@ def _sanitize(report) -> dict:
 
 def _collect_dropped(report: dict, out_dir: Path) -> list[tuple[str, bytes]]:
     """Read back the files the monitor copied out, by index only, re-checking every cap."""
-    blobs, total, meta = [], 0, []
+    blobs, total, meta, seen = [], 0, [], set()
     for d in report.get("dropped") or []:
         idx = d.get("index")
         if not isinstance(idx, int) or not 0 <= idx < MAX_DROPPED or len(blobs) >= MAX_DROPPED:
             continue
+        key = str(d.get("path") or "").lower()
+        if key and key in seen:     # the monitor scans TEMP inside LOCALAPPDATA: same file twice
+            continue
+        seen.add(key)
         p = out_dir / "dropped" / f"{idx:03d}.bin"
         try:
             if p.is_symlink() or not p.is_file():

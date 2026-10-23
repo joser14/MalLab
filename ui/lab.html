@@ -1039,7 +1039,11 @@ function sysmonHtml(d) {
     <div class="sublabel">DNS queries <span class="badge">${(b.dns || []).length}</span></div>${tbl(b.dns || [], [[(r) => r.query, "mono break"], [(r) => nm(r.image), "small"]])}
     <div class="sublabel">Registry writes <span class="badge">${(b.registry || []).length}</span></div>${tbl(b.registry || [], [[(r) => r.key, "mono break small"], [(r) => r.details, "small break"]])}
     <div class="sublabel">Files created <span class="badge">${(b.files || []).length}</span></div>${tbl(b.files || [], [[(r) => r.path, "mono break small"], [(r) => nm(r.image), "small"]])}
-    ${(b.file_deletes || []).length ? `<div class="sublabel">Files deleted <span class="badge">${b.file_deletes.length}</span></div>${tbl(b.file_deletes, [[(r) => r.path, "mono break small"], [(r) => nm(r.image), "small"]])}` : ""}`);
+    ${(b.file_deletes || []).length ? `<div class="sublabel">Files deleted <span class="badge">${b.file_deletes.length}</span></div>${tbl(b.file_deletes, [[(r) => r.path, "mono break small"], [(r) => nm(r.image), "small"]])}` : ""}
+    ${b.lineage_known && b.background ? `<details style="margin-top:6px"><summary class="small" style="cursor:pointer">Windows background activity in the VM, not counted as the sample's
+      (${Object.entries(b.background.counts || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`).join(", ") || "none"})</summary>
+      <p class="small" style="margin:6px 0">Only the sample's own process tree (and anything it injected into) feeds detections. A fresh Windows VM also runs its own services, shown here for transparency.</p>
+      ${tbl(b.background.processes || [], [[(r) => r.name, "mono"], [(r) => r.cmd, "small mono break"]])}</details>` : ""}`);
 }
 const epHost = (ep) => { const e = String(ep).split(" ")[0]; return e.startsWith("[") ? e.slice(1).split("]")[0] : e.includes(":") ? e.slice(0, e.lastIndexOf(":")) : e; };
 function ptree(roots) {
