@@ -360,6 +360,26 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         background(run, on_error_type="lab_actors_imported")
         return JSONResponse({"ok": True})
 
+    async def blu_arm(request):
+        b = await _body(request)
+        return await _call(lab.set_blu_mode, bool(b.get("arm")), str(b.get("confirm", "")))
+
+    async def host_observe(request):
+        b = await _body(request)
+        sid = request.path_params["sid"]
+        if lab.detonating:
+            return JSONResponse({"error": "a run is already in progress"}, status_code=409)
+        seconds = _int(b.get("seconds"), 60, 10, 1800)
+        confirm = str(b.get("confirm", ""))
+        # Validate the gate synchronously so the UI gets a clear error; then run in the background.
+        st = lab.blu_status()
+        if not st["armed"]:
+            return _err(RuntimeError("BLU MODE is not armed. Arm it in Settings first."))
+        if confirm.strip().upper() != st["token"]:
+            return _err(ValueError("confirmation phrase does not match"), 400)
+        background(lambda: lab.host_observe(sid, seconds=seconds, confirm=confirm))
+        return JSONResponse({"ok": True})
+
     async def sandbox_open(request):
         b = await _body(request)
         try:
@@ -511,6 +531,8 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/sample/{sid}/annotate", annotate, methods=["POST"]),
         Route("/api/lab/sample/{sid}/related", related),
         Route("/api/lab/sandbox/open", sandbox_open, methods=["POST"]),
+        Route("/api/lab/blu/arm", blu_arm, methods=["POST"]),
+        Route("/api/lab/sample/{sid}/observe", host_observe, methods=["POST"]),
         Route("/api/lab/sample/{sid}/yara", yara_generate),
         Route("/api/lab/sample/{sid}/actors", actor_suggest),
         Route("/api/lab/case/{cid}/attck", case_attck),

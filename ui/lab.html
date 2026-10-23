@@ -317,6 +317,11 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
 .lead { padding: 13px 15px; border: 1.5px solid var(--line2); border-radius: var(--r); display: grid; gap: 6px; background: var(--surface); }
 .lead + .lead { margin-top: 10px; }
 .top .status button.sm { margin-right: 4px; }
+/* BLU MODE: blue-team host observation */
+.blu-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font: 800 10.5px var(--mono); letter-spacing: .12em;
+  color: #fff; background: linear-gradient(120deg, #1455ff, #4a63ff); box-shadow: 2px 2px 0 var(--shadow-strong); }
+.blu-row { border-left: 4px solid var(--blue); }
+.set h2 .blu-badge { vertical-align: 2px; margin-right: 4px; }
 @media (max-width: 680px) { .tl > div { grid-template-columns: 1fr; gap: 2px; } }
 
 @media (max-width: 1200px) {
@@ -973,6 +978,11 @@ function tabBehavior() {
       <div class="field"><label>Network</label>${seg("d-net", NET_OPTS, OPTS.net)}</div>
       <div class="grow small" style="min-width:200px">${sb.available ? "Runs in a fresh Windows Sandbox that's wiped afterward." : "Windows Sandbox is off on this PC, so detonation isn't available."}</div>
       <button class="danger" id="d-go" ${sb.available && !DETONATING[sid] ? "" : "disabled"}>${DETONATING[sid] ? `<span class="spin"></span> Detonating…` : "Detonate"}</button></div></div>
+    ${LAB && LAB.blu && LAB.blu.armed ? `<div class="card blu-row"><div class="row" style="align-items:flex-end;gap:18px">
+      <div><div class="row" style="gap:8px"><span class="blu-badge">BLU</span><b>Observe this host</b></div>
+        <p class="small" style="margin-top:6px;max-width:52ch">Records this computer for the window below while <b>you</b> run the sample yourself. MalLab executes nothing. Only on a machine set aside for analysis.</p></div>
+      <div class="field"><label for="blu-secs">Window</label><select id="blu-secs">${timeOpts(OPTS.timeout)}</select></div>
+      <button id="blu-go" ${DETONATING[sid] ? "disabled" : ""}>${DETONATING[sid] ? `<span class="spin"></span> Observing…` : "Observe host"}</button></div></div>` : ""}
     <div class="card flush"><div class="row" style="padding:16px 18px 12px"><h3 class="grow" style="margin:0">Runs</h3>${withReport.length >= 2 ? `<button class="sm" id="d-diff">Compare last two</button>` : ""}</div>
       ${runs.length ? `<table><thead><tr><th>Started</th><th>Status</th><th>Verdict</th><th></th></tr></thead><tbody>${runs.map((r) => `<tr class="${r.report ? "link" : ""}" data-run="${r.report ? r.id : ""}"><td class="small">${fmtDate(r.started)}</td><td><span class="badge">${esc(cap(r.status))}</span></td><td>${esc(r.verdict || "")}</td><td class="chev">${r.report ? "›" : ""}</td></tr>`).join("")}</tbody></table>`
         : `<div class="none" style="padding:0 18px 18px">No runs yet.</div>`}</div>
@@ -980,6 +990,7 @@ function tabBehavior() {
   let net = OPTS.net;
   wireSeg("d-net", (v) => net = v);
   $("d-go").onclick = () => detonate(sid, +$("d-timeout").value, net);
+  if ($("blu-go")) $("blu-go").onclick = () => observeHost(sid, +$("blu-secs").value);
   $("tab").querySelectorAll("tr[data-run]").forEach((tr) => { if (tr.dataset.run) tr.onclick = () => showRun(sid, tr.dataset.run); });
   if ($("d-diff")) $("d-diff").onclick = () => diffRuns(sid, withReport);
   if (withReport.length) showRun(sid, withReport.some((r) => r.id === SAMPLE.run) ? SAMPLE.run : withReport[0].id);
@@ -994,9 +1005,11 @@ async function showRun(sid, rid) {
   const shot = d.screenshot ? `/api/lab/sample/${sid}/screenshot/${rid}` : null, pcap = d.pcap ? `/api/lab/sample/${sid}/pcap/${rid}` : null;
   const persist = [...(d.new_runkeys || []), ...(d.new_tasks || []).map((t) => "task: " + t), ...(d.new_services || []).map((x) => "service: " + x)];
   $("d-run").innerHTML = `<div class="card flush">
+    ${d.host_observation ? `<div class="notice blu-row" style="margin:0;border-radius:0"><span class="blu-badge">BLU</span><div class="grow"><b>Host observation — this ran on this computer, not in a sandbox.</b> MalLab executed nothing; it recorded what happened while the sample was run here. Changes below are everything on the host during the window, so expect some unrelated system activity.</div></div>` : ""}
     <div style="padding:18px"><div class="kv"><div class="k">Verdict</div><div><b>${esc(d.verdict || "")}</b></div>
-      <div class="k">Executed</div><div>${d.detonated ? "Yes" : "No"}${d.launch_error ? " · " + esc(d.launch_error) : ""}</div>
-      <div class="k">Network</div><div>${{ off: "Off", simulated: "Simulated (FakeNet-NG inside the VM; nothing real leaves)", internet: "Internet only (LAN and host blocked by an in-VM firewall rule)", full: "Full, including your LAN" }[d.network_mode] || (d.safe_net ? "Internet only (LAN and host blocked by an in-VM firewall rule)" : "Not recorded")}${d.host_guard === true ? " · host network guard on" : d.host_guard === false ? ` · <span style="color:var(--amber)">host network guard was off</span>` : ""}</div>
+      ${d.host_observation ? `<div class="k">Mode</div><div>BLU MODE host observation (MalLab executed nothing)</div>`
+        : `<div class="k">Executed</div><div>${d.detonated ? "Yes" : "No"}${d.launch_error ? " · " + esc(d.launch_error) : ""}</div>
+      <div class="k">Network</div><div>${{ off: "Off", simulated: "Simulated (FakeNet-NG inside the VM; nothing real leaves)", internet: "Internet only (LAN and host blocked by an in-VM firewall rule)", full: "Full, including your LAN" }[d.network_mode] || (d.safe_net ? "Internet only (LAN and host blocked by an in-VM firewall rule)" : "Not recorded")}${d.host_guard === true ? " · host network guard on" : d.host_guard === false ? ` · <span style="color:var(--amber)">host network guard was off</span>` : ""}</div>`}
       ${d.fakenet && d.fakenet.died_at != null ? `<div class="k">Integrity</div><div style="color:var(--red)"><b>FakeNet-NG stopped ${esc(String(d.fakenet.died_at))}s into the run.</b> The VM's adapters were switched off, but traffic after that point may have reached the internet.</div>` : ""}
       ${d.early_finish ? `<div class="k">Integrity</div><div style="color:var(--amber)"><b>The report arrived before the observation window ended.</b> The sample may have interfered with the monitor; treat these results with care.</div>` : ""}
       ${(d.isolation_failed || []).length ? `<div class="k">Isolation</div><div style="color:var(--red)"><b>Sample was not run: the sandbox failed its isolation check.</b> ${esc(d.isolation_failed.join("; "))}</div>` : ""}
@@ -1072,6 +1085,20 @@ async function detonate(sid, timeout, net) {
   const r = await api(`/api/lab/sample/${sid}/detonate`, { timeout, ...netBody(net), do_detonate: true });
   if (r.error) return toast(r.error, true);
   DETONATING[sid] = true; toast("Detonation started. This page updates when it's done.");
+  if (cur.sid === sid) renderSample(true);
+}
+async function observeHost(sid, seconds) {
+  const phrase = LAB.blu.token;
+  const ok = await ask({ title: "Observe this host?", ok: "Start observing", danger: true,
+    body: `<p>MalLab will record this computer for <b>${seconds}s</b>: new processes, files, registry, network and Sysmon events. <b>It runs nothing.</b> Run the sample yourself during the window.</p>
+      <p>Only on a machine set aside for analysis. Reimage it afterward.</p>
+      <p>Type <b>${esc(phrase)}</b> to confirm:</p><input id="blu-obs-confirm" style="width:100%" autocomplete="off" spellcheck="false">` });
+  if (!ok) return;
+  const confirm = (document.getElementById("blu-obs-confirm") || {}).value || "";
+  const r = await api(`/api/lab/sample/${sid}/observe`, { seconds, confirm });
+  if (r.error) return toast(r.error, true);
+  DETONATING[sid] = true;
+  toast(`Observing this host for ${seconds}s. Run the sample now. This page updates when done.`);
   if (cur.sid === sid) renderSample(true);
 }
 async function diffRuns(sid, runs) {
@@ -1330,6 +1357,8 @@ async function viewSettings() {
       <p class="small" style="margin-top:12px">Windows asks for administrator approval every time you change this. It doesn't stop traffic to the internet or your LAN, which goes out through Windows' NAT rather than into this PC. Other Hyper-V VMs on the Default Switch are blocked from this PC too while it's on.</p>
     </div></section>
 
+  ${bluSection()}
+
   <section class="set"><div><h2>Threat intel</h2><p class="sub">Hash lookups only; samples are never uploaded. Leave a field blank to keep its current key.</p></div>
     <div>
       <div class="field"><label for="k-vt">VirusTotal ${keyPill("vt")}</label><input type="password" id="k-vt" placeholder="VT_API_KEY" autocomplete="off"></div>
@@ -1365,6 +1394,7 @@ async function viewSettings() {
     </div></section>`, true);
   $("def-sw").onchange = () => setDefender($("def-sw").checked);
   $("ng-sw").onchange = () => setNetGuard($("ng-sw").checked);
+  if ($("blu-sw")) $("blu-sw").onchange = () => setBlu($("blu-sw").checked);
   const saveKeys = async (body, btn) => {
     if (!Object.values(body).some((v) => v)) return toast("Nothing to save. Enter a value first.", true);
     btn.disabled = true; const r = await api("/api/lab/config", body); btn.disabled = false;
@@ -1394,6 +1424,35 @@ function toolCell(tool, ready, readyText) {
     : `<button class="sm ${ready ? "" : "primary"}" data-tool="${tool}">${ready ? "Update" : "Download"}</button>`;
   return `<div class="grow">${ready ? `<span class="badge ok">Installed${v ? " " + esc(v) : ""}</span> ${readyText}`
     : `Not installed. Downloads the latest official release from <a href="${TOOL_LINKS[tool]}" target="_blank" rel="noopener">GitHub</a> over HTTPS (checked against GitHub's published SHA-256 when the release has one).`}</div>${btn}`;
+}
+function bluSection() {
+  const b = (LAB && LAB.blu) || {};
+  const state = !b.supported ? esc(b.message || "Not available on this system.")
+    : b.armed ? "Armed. Host observation is available on a sample's Behavior tab."
+    : "Off. Detonation in Windows Sandbox is the safe default.";
+  return `<section class="set"><div><h2><span class="blu-badge">BLU</span> BLU MODE</h2>
+    <p class="sub">Blue-team host observation for incident responders on a dedicated analysis machine with no Windows Sandbox.</p></div>
+    <div>
+      <div class="toggle-row blu-row"><div class="grow"><b>Arm BLU MODE</b><span class="small" id="blu-state">${state}</span></div>
+        ${sw("blu-sw", b.armed === true, b.supported ? 'aria-label="Arm BLU MODE host observation"' : "disabled")}</div>
+      <div class="notice" style="margin-top:16px"><span class="nic">i</span><div class="grow">
+        <b>MalLab never runs the sample in this mode.</b> It records what happens on <b>this computer</b> over a window — new processes, files, registry, network and Sysmon events — while <b>you</b> run the sample yourself, deliberately, outside MalLab.
+        Use it only on a machine you have set aside for analysis, or one already under investigation. Treat this computer as compromised afterward: reimage it.
+        ${b.sysmon ? "" : "<br><b>Tip:</b> install Sysmon (Analysis tools below) for full process, network and registry detail."}</div></div>
+    </div></section>`;
+}
+async function setBlu(arm) {
+  $("blu-sw").checked = LAB.blu.armed === true;   // only flips once confirmed
+  if (!arm) { const r = await api("/api/lab/blu/arm", { arm: false }); if (!r.error) toast("BLU MODE disarmed"); return viewSettings(); }
+  const phrase = LAB.blu.token;
+  const ok = await ask({ title: "Arm BLU MODE?", ok: "Arm BLU MODE", danger: true,
+    body: `<p>BLU MODE lets you capture what a sample does <b>on this computer</b>, for incident responders without Windows Sandbox. <b>MalLab still executes nothing</b> — you run the sample yourself.</p>
+      <p>Only do this on a machine set aside for analysis. Assume this PC is compromised afterward and reimage it.</p>
+      <p>Type <b>${esc(phrase)}</b> to confirm:</p><input id="blu-confirm" style="width:100%" autocomplete="off" spellcheck="false" placeholder="${esc(phrase)}">` });
+  if (!ok) return;
+  const r = await api("/api/lab/blu/arm", { arm: true, confirm: (document.getElementById("blu-confirm") || {}).value || "" });
+  if (r.error) return toast(r.error, true);
+  toast("BLU MODE armed"); viewSettings();
 }
 async function setDefender(exclude) {
   $("def-sw").checked = !exclude;   // the switch only moves once Windows confirms the change

@@ -13,8 +13,8 @@ import threading
 import time
 from pathlib import Path
 
-from . import (actors, archives, defender, diffing, fakenet, intel, ioc_intel, netguard, sandbox, signatures,
-               static, tooling, yara_rules)
+from . import (actors, archives, defender, diffing, fakenet, hostmon, intel, ioc_intel, netguard, sandbox,
+               signatures, static, tooling, yara_rules)
 from .samples import SampleSource, sha256_of
 from .store import Store
 
@@ -207,6 +207,68 @@ class MalLab:
     def sandbox_status(self) -> dict:
         ok, msg = sandbox.available()
         return {"available": ok, "message": msg, "busy": self.detonating}
+
+    # ---- BLU MODE: blue-team host observation (no sandbox, executes nothing) ----
+    #
+    # For incident responders on a dedicated analysis machine (or a host already under
+    # investigation) that has no Windows Sandbox. MalLab NEVER runs the sample in this mode; it
+    # only records what happens on this computer over a window, which the analyst drives
+    # themselves. It is off until explicitly armed, and each capture needs a typed confirmation.
+
+    _BLU_TOKEN = "I ACCEPT THE RISK"
+
+    def blu_status(self) -> dict:
+        ok, msg = hostmon.available()
+        return {"supported": ok, "message": msg, "armed": (self.lab_root / "blu-mode.on").exists(),
+                "token": self._BLU_TOKEN, "sysmon": (self.tools_dir / "Sysmon64.exe").exists()}
+
+    def set_blu_mode(self, arm: bool, confirm: str = "") -> dict:
+        """Arm or disarm BLU MODE. Arming needs the exact typed confirmation phrase."""
+        if arm:
+            ok, msg = hostmon.available()
+            if not ok:
+                raise RuntimeError(msg)
+            if (confirm or "").strip().upper() != self._BLU_TOKEN:
+                raise ValueError(f'To arm BLU MODE, type exactly: {self._BLU_TOKEN}')
+            (self.lab_root / "blu-mode.on").write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+            self._emit(type="lab_log", text="BLU MODE armed. Host observation is available. MalLab still "
+                                            "executes nothing; it only records this host.")
+        else:
+            (self.lab_root / "blu-mode.on").unlink(missing_ok=True)
+            self._emit(type="lab_log", text="BLU MODE disarmed.")
+        return self.blu_status()
+
+    def host_observe(self, sample_id: str, *, seconds: int = 60, confirm: str = "") -> dict:
+        """Record this host for a window and attach the behaviour report to a sample. Executes
+        nothing: the analyst runs the sample themselves, outside MalLab. Gated and confirmed."""
+        if not (self.lab_root / "blu-mode.on").exists():
+            raise RuntimeError("BLU MODE is not armed. Arm it in Settings first.")
+        if (confirm or "").strip().upper() != self._BLU_TOKEN:
+            raise ValueError(f'Type exactly "{self._BLU_TOKEN}" to confirm this host observation.')
+        s = self.store.get_sample(sample_id)
+        if not s:
+            raise ValueError("no such sample")
+        if not self.detonate_lock.acquire(blocking=False):
+            raise RuntimeError("A run is already in progress.")
+        self.detonating = True
+        run = self.store.create_run(sample_id, "host-observation",
+                                    {"seconds": seconds, "do_detonate": False, "mode": "host"})
+        self._emit(type="lab_run_started", run_id=run["id"], sample_id=sample_id)
+        try:
+            report = hostmon.observe(self.runs_root, seconds=seconds, sysmon_dir=self.tools_dir,
+                                     emit=lambda ev: self._emit(**ev))
+            rel = f"dynamic-{run['id']}.json"
+            (self.store.report_dir(s["sha256"]) / rel).write_text(json.dumps(report, indent=2), encoding="utf-8")
+            self.store.finish_run(run["id"], "done", report.get("verdict", ""), rel)
+            self._emit(type="lab_run_done", run_id=run["id"], sample_id=sample_id, verdict=report.get("verdict", ""))
+            return self.store.get_run(run["id"])
+        except Exception as e:
+            self.store.finish_run(run["id"], "error", f"{type(e).__name__}: {e}", "")
+            self._emit(type="lab_run_done", run_id=run["id"], sample_id=sample_id, verdict=f"error: {e}")
+            raise
+        finally:
+            self.detonating = False
+            self.detonate_lock.release()
 
     def detonate(self, sample_id: str, *, timeout: int = 60, networking: bool = False,
                  memory_mb: int = 4096, do_detonate: bool = True, safe_net: bool = True,
@@ -904,6 +966,7 @@ class MalLab:
             "yara_rules": len(self.yara_list()),
             "sysmon": self.sysmon_status(),
             "capa": bool(static.find_capa(self.tools_dir)),
+            "blu": self.blu_status(),
             "tools": self.tools_status(),
             "setup_pending": self.setup_pending(),
             "actor_count": len(self.store.list_actors()),
