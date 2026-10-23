@@ -47,10 +47,10 @@ def parse(events: list, monitor_pid=None, launcher_pid=None) -> dict:
     tooling_pids, lineage, lineage_pids = set(), set(), set()   # lineage holds ProcessGuids
     lineage_known = False
 
+    pending = []    # attributed after the loop: an event can precede the launcher's own start
+
     def add(kind, rec, guid, pid=None):
-        # Match by ProcessGuid; fall back to the PID when an event carries no GUID.
-        mine = not lineage_known or (guid in lineage if guid else pid in lineage_pids)
-        (out if mine else bg)[kind].append(rec)
+        pending.append((kind, rec, guid, pid))
 
     for ev in events or []:
         if not isinstance(ev, dict):
@@ -111,6 +111,8 @@ def parse(events: list, monitor_pid=None, launcher_pid=None) -> dict:
                 tgt = _s(d.get("TargetProcessGuid") or d.get("TargetProcessGUID"), 60)
                 if tgt:
                     lineage.add(tgt)
+                if _int(d.get("TargetProcessId")) is not None:
+                    lineage_pids.add(_int(d.get("TargetProcessId")))
             add("remote_threads", {"time": t, "source": _s(d.get("SourceImage"), 500),
                                    "target": _s(d.get("TargetImage"), 500),
                                    "source_pid": _int(d.get("SourceProcessId")),
@@ -122,8 +124,13 @@ def parse(events: list, monitor_pid=None, launcher_pid=None) -> dict:
                 add("lsass_access", {"time": t, "source": src, "access": _s(d.get("GrantedAccess"), 20)},
                     _s(d.get("SourceProcessGUID") or d.get("SourceProcessGuid"), 60), _int(d.get("SourceProcessId")))
 
+    for kind, rec, guid, pid in pending:
+        # Match by ProcessGuid; fall back to the PID when an event carries no GUID.
+        mine = not lineage_known or (guid in lineage if guid else pid in lineage_pids)
+        (out if mine else bg)[kind].append(rec)
     for k in KINDS:
         out[k] = out[k][:CAP]
+    out["lineage"] = {"guids": sorted(g for g in lineage if g), "pids": sorted(p for p in lineage_pids if p is not None)}
     out["dns"] = list({(x["query"]): x for x in out["dns"] if x["query"]}.values())
     out["counts"] = {k: len(out[k]) for k in KINDS}
     out["lineage_known"] = lineage_known

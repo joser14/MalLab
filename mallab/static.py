@@ -331,27 +331,80 @@ def _archive_listing(path: Path) -> dict | None:
         return {"error": str(e)}
 
 
+_YARA_CACHE: dict = {}
+
+
+def compiled_yara(rules_dir: Path | None, only: list[Path] | None = None) -> dict:
+    """Compile the lab's YARA rules into groups: your own rules (rules_dir\\*.yar) and each pack
+    under rules_dir\\packs (YARA Forge etc.), separately, so one pack that fails to compile never
+    stops the rest. Compiled once per file state. Returns {groups: [(label, rules)], errors, count}."""
+    import yara
+    root = Path(rules_dir) if rules_dir else None
+    if only is not None:
+        files = [Path(f) for f in only]
+    elif root and root.exists():
+        files = sorted([*root.glob("*.yar"), *root.glob("*.yara"), *(root / "packs").glob("*.yar"),
+                        *(root / "packs").glob("*.yara"), *(root / "packs").glob("*.mlx")])
+    else:
+        files = []
+    key = tuple((str(f), f.stat().st_mtime, f.stat().st_size) for f in files if f.is_file())
+    if _YARA_CACHE.get("key") == key:
+        return _YARA_CACHE["value"]
+    own = {f.stem: str(f) for f in files if f.parent.name != "packs"}
+    packs = [f for f in files if f.parent.name == "packs"]
+    groups, errors = [], []
+    if own:
+        try:
+            groups.append(("rules", yara.compile(filepaths=own)))
+        except Exception as e:
+            errors.append(f"your rules: {e}")
+    for p in packs:
+        try:
+            if p.suffix == ".mlx":   # encoded on disk so antivirus doesn't quarantine it (tooling.py)
+                from .tooling import decode_pack
+                rules = yara.compile(source=decode_pack(p.read_bytes()).decode("utf-8", "replace"))
+                groups.append((p.name[:-len(".mlx")].rsplit(".", 1)[0], rules))
+            else:
+                groups.append((p.stem, yara.compile(filepath=str(p))))
+        except Exception as e:
+            errors.append(f"{p.name}: {e}")
+    value = {"groups": groups, "errors": errors, "count": len(own) + len(packs)}
+    if only is None:
+        _YARA_CACHE.update(key=key, value=value)
+    return value
+
+
+def yara_matches(target, compiled: dict) -> list[dict]:
+    """Match a file path (str/Path) or bytes against every compiled group."""
+    out = []
+    for label, rules in compiled["groups"]:
+        try:
+            ms = rules.match(data=target, timeout=60) if isinstance(target, bytes) else rules.match(str(target), timeout=60)
+        except Exception:
+            continue
+        out += [{"rule": m.rule, "tags": list(m.tags), "source": label,
+                 "description": str((m.meta or {}).get("description", ""))[:300],
+                 "author": str((m.meta or {}).get("author", ""))[:120]} for m in ms]
+    return out
+
+
 def _yara_scan(path: Path, rules_dir: Path | None) -> dict | None:
     if not rules_dir or not Path(rules_dir).exists():
         return None
     try:
-        import yara
+        import yara  # noqa: F401
     except ImportError:
         return {"note": "yara-python not installed"}
-    rule_files = {}
-    for rf in Path(rules_dir).rglob("*.yar"):
-        rule_files[rf.stem] = str(rf)
-    for rf in Path(rules_dir).rglob("*.yara"):
-        rule_files[rf.stem] = str(rf)
-    if not rule_files:
-        return {"note": f"no .yar/.yara rules in {rules_dir}"}
     try:
-        rules = yara.compile(filepaths=rule_files)
-        matches = rules.match(str(path), timeout=60)
-        return {"matches": [{"rule": m.rule, "tags": list(m.tags)} for m in matches],
-                "rules_loaded": len(rule_files)}
+        compiled = compiled_yara(rules_dir)
     except Exception as e:
         return {"error": str(e)}
+    if not compiled["count"]:
+        return {"note": f"no .yar/.yara rules in {rules_dir}"}
+    res = {"matches": yara_matches(path, compiled), "rules_loaded": compiled["count"]}
+    if compiled["errors"]:
+        res["errors"] = compiled["errors"][:5]
+    return res
 
 
 def find_capa(tools_dir: Path | None) -> str | None:

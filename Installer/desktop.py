@@ -85,6 +85,9 @@ def main() -> int:
     p.add_argument("--setup-sysmon", action="store_true", help="download Sysmon, then exit")
     p.add_argument("--setup-capa", action="store_true", help="download capa, then exit")
     p.add_argument("--setup-fakenet", action="store_true", help="download FakeNet-NG, then exit")
+    p.add_argument("--setup-memscan", action="store_true", help="download hollows_hunter (pe-sieve), then exit")
+    p.add_argument("--setup-sigma", action="store_true", help="download SigmaHQ rules, then exit")
+    p.add_argument("--setup-yara-forge", action="store_true", help="download YARA Forge rules, then exit")
     p.add_argument("--import-actors", action="store_true", help="import public threat-group data, then exit")
     p.add_argument("--defender-exclude", action="store_true", help="add the Defender exclusion, then exit")
     p.add_argument("--host-guard", action="store_true", help="turn on the host network guard, then exit")
@@ -105,6 +108,9 @@ def main() -> int:
     steps =[(args.setup_sysmon, "Sysmon", lambda lab: lab.setup_sysmon()),
              (args.setup_capa, "capa", lambda lab: lab.setup_tool("capa")),
              (args.setup_fakenet, "FakeNet-NG", lambda lab: lab.setup_tool("fakenet")),
+             (args.setup_memscan, "hollows_hunter", lambda lab: lab.setup_tool("hollows_hunter")),
+             (args.setup_sigma, "Sigma rules", lambda lab: lab.setup_tool("sigma")),
+             (args.setup_yara_forge, "YARA Forge rules", lambda lab: lab.setup_tool("yara_forge")),
              (args.import_actors, "threat-group data", lambda lab: lab.import_actor_catalog()),
              (args.defender_exclude, "Defender exclusion", lambda lab: lab.set_defender_exclusion(True)),
              (args.host_guard, "host network guard", lambda lab: lab.set_netguard(True))]

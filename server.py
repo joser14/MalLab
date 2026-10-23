@@ -427,6 +427,13 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         except ValueError as e:
             return _err(e)
 
+    async def yara_retrohunt(request):
+        b = await _body(request)
+        return await _call(lab.retrohunt, b.get("name") or None, b.get("text") or None)
+
+    async def yara_packs(request):
+        return JSONResponse({"packs": await asyncio.to_thread(lab.yara_packs)})
+
     async def yara_delete(request):
         try:
             lab.yara_delete(request.path_params["name"])
@@ -471,7 +478,7 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
 
     async def tool_setup(request):
         tool = request.path_params["tool"]
-        if tool not in ("capa", "fakenet", "sysmon"):
+        if tool not in ("capa", "fakenet", "sysmon", "hollows_hunter", "sigma", "yara_forge"):
             return JSONResponse({"error": "unknown tool"}, status_code=404)
 
         def run():
@@ -528,6 +535,8 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/sample/{sid}/diff", diff, methods=["POST"]),
         Route("/api/lab/yara", yara_list),
         Route("/api/lab/yara/save", yara_save, methods=["POST"]),
+        Route("/api/lab/yara/retrohunt", yara_retrohunt, methods=["POST"]),
+        Route("/api/lab/yara/packs", yara_packs),
         Route("/api/lab/yara/{name}", yara_get),
         Route("/api/lab/yara/{name}/delete", yara_delete, methods=["POST"]),
         Route("/api/lab/config", config, methods=["POST"]),

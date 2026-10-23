@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from . import fakenet, sysmon
+from . import fakenet, sigma, sysmon
 
 SANDBOX_EXE = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "WindowsSandbox.exe"
 
@@ -191,6 +191,20 @@ while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 3
 }
 $report.net_timeline = $timeline
+
+# Memory scan (hollows_hunter / pe-sieve): find code injected into processes, hollowed images and
+# unpacked payloads, and dump them so the host can triage them like any other sample. Runs here,
+# inside the VM, while the sample's processes are still alive.
+$hh = Join-Path $inDir "tools\hollows_hunter64.exe"
+if ($report.detonated -and (Test-Path $hh)) {
+    $memDir = Join-Path $outDir "memdump"
+    try {
+        $hp = Start-Process -FilePath $hh -ArgumentList "/dir", "`"$memDir`"", "/uniqd", "/quiet", "/json" -PassThru `
+              -WindowStyle Hidden -RedirectStandardOutput (Join-Path $outDir "hh-summary.json") -ErrorAction Stop
+        if (-not $hp.WaitForExit(180000)) { try { $hp.Kill() } catch {}; $report.memscan_error = "memory scan timed out after 3 minutes" }
+        $report.memscan = $true
+    } catch { $report.memscan_error = $_.Exception.Message }
+}
 # The sample is still running: take the adapters down first, then stop FakeNet, so nothing
 # slips out while the monitor collects results.
 if ($fn) {
@@ -465,7 +479,7 @@ def detonate(sample_bytes: bytes, original_name: str, runs_root: Path, *,
     if tools_dir and Path(tools_dir).exists():
         staged = in_dir / "tools"
         staged.mkdir(exist_ok=True)
-        for name in ("Sysmon64.exe", "sysmon-config.xml"):
+        for name in ("Sysmon64.exe", "sysmon-config.xml", "hollows_hunter64.exe"):
             src = Path(tools_dir) / name
             if src.exists():
                 shutil.copy2(src, staged / name)
@@ -490,7 +504,8 @@ def detonate(sample_bytes: bytes, original_name: str, runs_root: Path, *,
 
     done = out_dir / "done.flag"
     report_file = out_dir / "report.json"
-    hard_deadline = time.time() + timeout + 180  # VM boot + work + margin
+    memscan = bool(tools_dir) and (Path(tools_dir) / "hollows_hunter64.exe").is_file()
+    hard_deadline = time.time() + timeout + 180 + (200 if memscan else 0)  # VM boot + work + memory scan + margin
     try:  # from here on, always tear down the VM and wipe the staged sample
         emit({"type": "lab_log", "text": f"Launching Windows Sandbox (network "
                                          f"{mode.upper()}, detonate "
@@ -520,6 +535,7 @@ def detonate(sample_bytes: bytes, original_name: str, runs_root: Path, *,
         if do_detonate and report.get("detonated") and elapsed < timeout:
             report["early_finish"] = True
         report["_dropped_blobs"] = _collect_dropped(report, out_dir)
+        report["memory"], report["_memory_blobs"] = _collect_memory(out_dir / "memdump")
         if simulate:
             report["fakenet_log"] = fakenet.read_log(out_dir / "fakenet.log")
         # Preserve artifacts (screenshot, capture) before the ephemeral run folder is wiped.
@@ -565,6 +581,16 @@ def detonate(sample_bytes: bytes, original_name: str, runs_root: Path, *,
     if report.get("sysmon_events"):
         report["behavior"] = sysmon.parse(report["sysmon_events"], report.get("monitor_pid"),
                                           report.get("launcher_pid"))
+        # Community Sigma rules over the full event stream (the sample's lineage only).
+        rules_dir = Path(tools_dir) / "sigma" if tools_dir else None
+        if rules_dir and rules_dir.is_dir():
+            try:
+                compiled = sigma.cached_rules(rules_dir)
+                report["sigma"] = sigma.match(report["sysmon_events"], compiled, sigma.lineage_filter(report["behavior"]))
+                report["sigma_stats"] = {"rules": len(compiled["rules"]), "skipped": compiled["skipped"],
+                                         "errors": compiled["errors"]}
+            except Exception as e:   # a rule-pack problem must never cost the run's report
+                report["sigma_error"] = f"{type(e).__name__}: {e}"
         # The parsed behaviour is what's used; keep a slice of the raw events for reference
         # instead of storing (and sending to the UI) up to 20,000 of them on every load.
         report["sysmon_events"] = report["sysmon_events"][:200]
@@ -593,6 +619,16 @@ def _keep_lineage(report: dict):
     if len(meta) == len(blobs):
         report["dropped"] = [meta[i] for i in keep]
     report["_dropped_blobs"] = [blobs[i] for i in keep]
+
+    # Memory implants: only in the sample's processes (or ones it injected into).
+    mem = report.get("memory") or []
+    if mine_files is not None and mem:
+        lin = set((beh.get("lineage") or {}).get("pids") or [])
+        report["memory"] = [m for m in mem if m.get("pid") in lin]
+        report["background_memory"] = [{k: v for k, v in m.items() if k != "dumps"} for m in mem if m.get("pid") not in lin]
+        keep_sha = {d["sha256"] for m in report["memory"] for d in m.get("dumps") or []}
+        report["_memory_blobs"] = [(label, data) for label, data in report.get("_memory_blobs") or []
+                                   if hashlib.sha256(data).hexdigest() in keep_sha]
 
 
 MAX_OUTPUT_BYTES = 2 * 2**30          # whole shared output folder
@@ -640,12 +676,76 @@ def _sanitize(report) -> dict:
     report.pop("screenshot", None)
     report.pop("pcap", None)
     report.pop("_dropped_blobs", None)
+    report.pop("_memory_blobs", None)
+    report.pop("memory", None)       # built by the host from the dump folder, never taken from the VM's JSON
     # Set by the host only: the parsed FakeNet log and whether the host guard was on.
     report.pop("fakenet_log", None)
     report.pop("host_guard", None)
     if not isinstance(report.get("fakenet"), bool):
         report.pop("fakenet", None)
     return report
+
+
+MAX_MEM_DUMPS = 15
+_MEM_KEYS = ("patched", "iat_hooked", "replaced", "hdr_modified", "implanted_pe", "implanted_shc", "unreachable_file", "other")
+_DUMP_EXT = re.compile(r"\.(exe|dll|sys|shc|bin|dmp)$", re.I)
+
+
+def _collect_memory(mem_dir: Path) -> tuple[list[dict], list[tuple[str, bytes]]]:
+    """Read hollows_hunter's per-process folders: each scan_report.json (what was modified in that
+    process) and the dumped modules / shellcode. Everything was written inside the VM, so: no
+    links, size caps on every file, JSON parsed defensively, paths never leave mem_dir."""
+    entries, blobs, total = [], [], 0
+    try:
+        if mem_dir.is_symlink() or not mem_dir.is_dir():
+            return [], []
+        dirs = sorted(d for d in mem_dir.iterdir() if d.is_dir() and not d.is_symlink())[:300]
+    except OSError:
+        return [], []
+    for d in dirs:
+        rep_file = d / "scan_report.json"
+        try:
+            if rep_file.is_symlink() or not rep_file.is_file() or rep_file.stat().st_size > 2 * 2**20:
+                continue
+            rep = json.loads(rep_file.read_text(encoding="utf-8-sig", errors="replace"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(rep, dict):
+            continue
+        scanned = rep.get("scanned") if isinstance(rep.get("scanned"), dict) else {}
+        mod = scanned.get("modified") if isinstance(scanned.get("modified"), dict) else {}
+        counts = {}
+        for k in _MEM_KEYS:
+            try:
+                counts[k] = max(0, int(mod.get(k) or 0))
+            except (TypeError, ValueError):
+                counts[k] = 0
+        if not any(counts.values()):
+            continue
+        try:
+            pid = int(rep.get("pid"))
+        except (TypeError, ValueError):
+            pid = None
+        image = str(rep.get("main_image_path") or "")[:500]
+        dumps = []
+        for f in sorted(d.iterdir()):
+            if len(blobs) >= MAX_MEM_DUMPS or not _DUMP_EXT.search(f.name):
+                continue
+            try:
+                if f.is_symlink() or not f.is_file():
+                    continue
+                size = f.stat().st_size
+                if not 0 < size <= MAX_DROPPED_BYTES or total + size > MAX_DROPPED_TOTAL:
+                    continue
+                data = f.read_bytes()[:MAX_DROPPED_BYTES]
+            except OSError:
+                continue
+            total += len(data)
+            label = f"{Path(image.replace(chr(92), '/')).name or 'process'}[{pid}] {f.name}"[:300]
+            blobs.append((label, data))
+            dumps.append({"name": f.name[:200], "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        entries.append({"pid": pid, "image": image, "modified": counts, "dumps": dumps})
+    return entries, blobs
 
 
 def _collect_dropped(report: dict, out_dir: Path) -> list[tuple[str, bytes]]:

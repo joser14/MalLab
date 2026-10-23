@@ -1,6 +1,7 @@
 httpx
 starlette
 uvicorn
+pyyaml      # Sigma rules
 # static analysis (optional but recommended; the engine degrades gracefully without them)
 pefile
 oletools

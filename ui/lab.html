@@ -1007,6 +1007,11 @@ async function showRun(sid, rid) {
     ${det.process_tree && det.process_tree.length ? sect("Process tree", true, ptree(det.process_tree)) : ""}
     ${sect(`New processes <span class="badge">${(d.new_processes || []).length}</span>`, (d.new_processes || []).length > 0, list((d.new_processes || []).map((p) => `${p.name} (pid ${p.pid}) ${p.cmd || ""}`)))}
     ${(d.dropped || []).length ? sect(`Collected payloads <span class="badge">${d.dropped.length}</span>`, true, `<p class="small" style="margin-bottom:8px">Copied out of the VM and added to this case as samples (static triage only).</p><div class="tbl"><table><tbody>${d.dropped.map((x) => `<tr><td class="mono break">${esc(x.path)}</td><td>${fmtSize(x.size)}</td><td class="mono small">${esc(x.sha256.slice(0, 16))}…</td></tr>`).join("")}</tbody></table></div>`) : ""}
+    ${d.memscan || d.memscan_error ? sect(`Memory scan <span class="badge">${(d.memory || []).length}</span>`, (d.memory || []).length > 0,
+      d.memscan_error ? `<div class="none" style="color:var(--amber)">${esc(d.memscan_error)}</div>`
+      : (d.memory || []).length ? `<p class="small" style="margin-bottom:8px">hollows_hunter found modified code in the sample's processes. Dumps were added to the case as samples.</p><div class="tbl"><table><tbody>${d.memory.map((m) => `<tr><td class="mono">${esc((m.image || "").split("\\").pop() || "?")} <span class="small">pid ${esc(String(m.pid))}</span></td>
+          <td class="small">${esc(Object.entries(m.modified || {}).filter(([, v]) => v).map(([k, v]) => `${k.replace(/_/g, " ")} ${v}`).join(", "))}</td><td class="small">${(m.dumps || []).length} dump(s)</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="none">No injected, hollowed or unpacked code found in the sample's processes.</div>`) : ""}
     ${sect(`Dropped files <span class="badge">${(d.new_files || []).length}</span>`, false, list(d.new_files))}
     ${sect(`Persistence <span class="badge">${persist.length}</span>`, persist.length > 0, list(persist))}
     ${sect(`Network <span class="badge">${(d.network || []).length}</span>`, (d.network || []).length > 0, list(d.network) + beacons(d) + `<div class="sublabel">DNS</div>` + list(d.dns))}
@@ -1214,9 +1219,20 @@ async function viewRules() {
   <div class="card flush"><div class="rules">
     <div class="rlist">${rules.map((x) => `<a href="#" data-rule="${esc(x.name)}" class="${x.name === yrCur ? "on" : ""}"><span class="mono">${esc(x.name)}</span><span class="small">${plural(x.rule_count, "rule")}${x.builtin ? " · starter" : ""}</span></a>`).join("") || `<div class="none" style="padding:16px">No rules yet</div>`}</div>
     <div class="editor"><div class="bar"><b class="grow mono" id="yr-title" style="font-size:13px;font-weight:500">Select a rule</b><span class="kbd hide-sm">Ctrl S</span>
+      <button class="sm" id="yr-hunt" disabled title="Scan every sample already in the lab with this rule">Retrohunt</button>
       <button class="sm" id="yr-save" disabled>Save</button><button class="sm ghost red" id="yr-del" disabled>Delete</button></div>
       <div class="body"><div class="gutter" id="yr-gutter">1</div><textarea id="yr-text" spellcheck="false" placeholder="Pick a rule on the left, or create a new one." aria-label="Rule source"></textarea></div></div>
-  </div></div>`);
+  </div></div>
+  <div id="yr-hunt-box" style="margin-top:20px"></div>
+  <div class="card" style="margin-top:20px"><h3>Rule packs</h3><div id="yr-packs"><span class="spin"></span></div></div>`);
+  api("/api/lab/yara/packs").then((r) => {
+    if (!$("yr-packs")) return;
+    const ps = r.packs || [];
+    $("yr-packs").innerHTML = ps.length ? `<div class="tbl"><table><tbody>${ps.map((p) => `<tr><td class="mono">${esc(p.name)}</td><td class="small">${p.rule_count.toLocaleString()} rules</td><td class="small">${fmtSize(p.size)}</td><td><button class="sm" data-hunt="${esc(p.name)}">Retrohunt</button></td></tr>`).join("")}</tbody></table></div>
+      <p class="small" style="margin-top:8px">Packs scan every new sample too. They're kept separate from your own rules, so one that fails to compile never blocks the rest. Update them in <a href="#/settings">Settings</a>.</p>`
+      : `<p class="small">No packs installed. Add the curated YARA Forge rules in <a href="#/settings">Settings → Analysis tools</a>.</p>`;
+    $("yr-packs").querySelectorAll("[data-hunt]").forEach((b) => b.onclick = () => retrohunt({ name: b.dataset.hunt }, b));
+  });
   main.querySelectorAll("[data-rule]").forEach((a) => a.onclick = (e) => { e.preventDefault(); editRule(a.dataset.rule); });
   const t = $("yr-text");
   t.oninput = gutter; t.onscroll = () => $("yr-gutter").scrollTop = t.scrollTop;
@@ -1228,7 +1244,7 @@ async function viewRules() {
     const n = $("yr-name").value.trim(); if (!n) { $("yr-name").focus(); return toast("Name the rule file first", true); }
     yrCur = n; $("yr-title").textContent = yrFile(n) + " (unsaved)";
     t.value = `rule ${n.replace(/\.yara?$/i, "").replace(/[^A-Za-z0-9_]/g, "_")}\n{\n    meta:\n        description = ""\n    strings:\n        $a = "suspicious"\n    condition:\n        $a\n}\n`;
-    gutter(); $("yr-save").disabled = false; $("yr-del").disabled = true; $("yr-name").value = ""; t.focus();
+    gutter(); $("yr-save").disabled = false; $("yr-hunt").disabled = false; $("yr-del").disabled = true; $("yr-name").value = ""; t.focus();
     main.querySelectorAll("[data-rule]").forEach((a) => a.classList.remove("on"));
   };
   $("yr-name").onkeydown = (e) => { if (e.key === "Enter") $("yr-new").click(); };
@@ -1243,14 +1259,32 @@ async function viewRules() {
     if (r.error) return toast(r.error, true);
     toast(`${yrFile(yrCur)} deleted`); yrCur = null; refreshState(); viewRules();
   };
+  $("yr-hunt").onclick = () => retrohunt($("yr-title").textContent.includes("(unsaved)") ? { text: t.value } : { name: yrCur, text: t.value }, $("yr-hunt"));
   if (yrCur && rules.some((x) => x.name === yrCur)) editRule(yrCur);
+}
+async function retrohunt(body, btn) {
+  const box = $("yr-hunt-box"); if (!box) return;
+  const label = body.name || "the unsaved rule";
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`; }
+  box.innerHTML = `<div class="card"><div class="row"><span class="spin"></span> Retrohunting with ${esc(label)}…</div></div>`;
+  // Packs are hunted by file; an open rule is hunted by its current text, saved or not.
+  const r = await api("/api/lab/yara/retrohunt", body.name && !body.text ? { name: body.name } : body);
+  if (btn) { btn.disabled = false; btn.textContent = "Retrohunt"; }
+  if (!$("yr-hunt-box")) return;
+  if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
+  box.innerHTML = `<div class="card"><h3>Retrohunt: ${esc(r.rule)}</h3>
+    <p class="small" style="margin-bottom:10px">${r.matched} of ${r.scanned} sample(s) in the lab matched · ${r.seconds}s</p>
+    ${r.hits.length ? `<div class="tbl"><table><thead><tr><th>Risk</th><th>Sample</th><th>Case</th><th>Rules</th></tr></thead><tbody>${r.hits.map((h) => `<tr class="link" data-href="#/case/${h.case_id}/sample/${h.id}">
+      <td>${riskBadge(h.risk)}</td><td class="mono" style="font-size:13px">${esc(h.filename)}</td><td class="small">${esc(h.case_name)}</td><td class="small mono break">${esc(h.rules.join(", "))}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="none">No sample in the lab matches.</div>`}</div>`;
+  wireRows();
 }
 function gutter() { const t = $("yr-text"); $("yr-gutter").textContent = Array.from({ length: Math.max(1, t.value.split("\n").length) }, (_, i) => i + 1).join("\n"); $("yr-gutter").scrollTop = t.scrollTop; }
 async function editRule(name) {
   const r = await api("/api/lab/yara/" + encodeURIComponent(name)); if (r.error) return toast(r.error, true);
   if (cur.view !== "rules") return;
   yrCur = name; $("yr-title").textContent = yrFile(name); $("yr-text").value = r.text; gutter();
-  $("yr-save").disabled = false; $("yr-del").disabled = false;
+  $("yr-save").disabled = false; $("yr-hunt").disabled = false; $("yr-del").disabled = false;
   main.querySelectorAll("[data-rule]").forEach((a) => a.classList.toggle("on", a.dataset.rule === name));
 }
 
@@ -1323,6 +1357,9 @@ async function viewSettings() {
     <div class="kv">
       <div class="k">capa</div><div class="row" style="gap:10px">${toolCell("capa", LAB.capa, "Capability detection runs on every PE.")}</div>
       <div class="k">FakeNet-NG</div><div class="row" style="gap:10px">${toolCell("fakenet", LAB.fakenet && LAB.fakenet.ready, "The <b>Simulated</b> network mode is available. It only ever runs inside the sandbox.")}</div>
+      <div class="k">Memory scan</div><div class="row" style="gap:10px">${toolCell("hollows_hunter", (LAB.tools.hollows_hunter || {}).ready, "hollows_hunter dumps injected and unpacked code at the end of each run, inside the sandbox only.")}</div>
+      <div class="k">Sigma rules</div><div class="row" style="gap:10px">${toolCell("sigma", (LAB.tools.sigma || {}).ready, `${(LAB.tools.sigma || {}).rules || 0} SigmaHQ community rules run on each detonation's Sysmon events.`)}</div>
+      <div class="k">YARA Forge</div><div class="row" style="gap:10px">${toolCell("yara_forge", (LAB.tools.yara_forge || {}).ready, "Curated public YARA rules scan every sample (see Rules → Packs).")}</div>
       <div class="k">Similarity</div><div>${(LAB.tools || {}).tlsh && LAB.tools.tlsh.ready ? `<span class="badge ok">Ready</span> TLSH fuzzy hashing powers “Related samples”.` : `<span class="badge ok">Ready</span> Related samples are matched by imphash, string overlap (built-in MinHash) and shared IOCs. TLSH is used too when <span class="mono">py-tlsh</span> is installed.`}</div>
       <div class="k">Threat groups</div><div>${LAB.actor_count ? `${LAB.actor_count} tracked.` : "None yet."} <a href="#/actors">Manage groups</a></div>
     </div></section>`, true);
@@ -1348,7 +1385,9 @@ async function viewSettings() {
   });
 }
 const TOOL_BUSY = {};
-const TOOL_LINKS = { capa: "https://github.com/mandiant/capa", fakenet: "https://github.com/mandiant/flare-fakenet-ng" };
+const TOOL_LINKS = { capa: "https://github.com/mandiant/capa", fakenet: "https://github.com/mandiant/flare-fakenet-ng",
+  hollows_hunter: "https://github.com/hasherezade/hollows_hunter", sigma: "https://github.com/SigmaHQ/sigma", yara_forge: "https://github.com/YARAHQ/yara-forge" };
+const TOOL_NAMES = { fakenet: "FakeNet-NG", hollows_hunter: "hollows_hunter", sigma: "Sigma rules", yara_forge: "YARA Forge rules", capa: "capa", sysmon: "Sysmon" };
 function toolCell(tool, ready, readyText) {
   const v = ((LAB.tools || {})[tool] || {}).version;
   const btn = TOOL_BUSY[tool] ? `<button disabled><span class="spin"></span> Downloading</button>`
@@ -1410,7 +1449,7 @@ function handle(e) {
     case "lab_sysmon": refreshState().then(() => { if (cur.view === "settings") viewSettings(); }); break;
     case "lab_tool_ready":
       delete TOOL_BUSY[e.tool];
-      if (e.error) toast(e.text, true); else toast(`${e.tool === "fakenet" ? "FakeNet-NG" : e.tool} installed`);
+      if (e.error) toast(e.text, true); else toast(`${TOOL_NAMES[e.tool] || e.tool} installed`);
       refreshState().then(() => { if (cur.view === "settings") viewSettings(); });
       break;
     case "lab_actors_imported":

@@ -5,6 +5,8 @@ does ("Process Injection", "Persistence via Run key", …), each tagged with ATT
 IDs and the concrete evidence that fired it. Pure logic over the report dicts — no I/O.
 """
 
+from pathlib import Path
+
 from . import sysmon
 
 SEV_ORDER ={"info": 0, "low": 1, "medium": 2, "high": 3}
@@ -32,6 +34,8 @@ TECHNIQUES = {
     "T1033": ("System Owner/User Discovery", "Discovery"), "T1016": ("System Network Configuration Discovery", "Discovery"),
     "T1003.001": ("LSASS Memory", "Credential Access"), "T1485": ("Data Destruction", "Impact"),
     "T1070.004": ("File Deletion", "Defense Evasion"),
+    "T1497": ("Virtualization/Sandbox Evasion", "Defense Evasion"), "T1055.012": ("Process Hollowing", "Defense Evasion"),
+    "T1574": ("Hijack Execution Flow", "Persistence"), "T1056.004": ("Credential API Hooking", "Collection"),
 }
 TACTICS = ("Execution", "Persistence", "Defense Evasion", "Credential Access", "Discovery",
            "Collection", "Command and Control", "Impact")
@@ -260,12 +264,66 @@ def _dynamic_rules(dyn: dict) -> list[dict]:
         out.append(_det("Dropped files collected", "info", ["T1105"],
                         "Files written by the sample were copied out and added to the case.",
                         [f"{d['path']} ({d['sha256'][:16]}…)" for d in dyn["dropped"]]))
+    implants = [m for m in dyn.get("memory") or []
+                if (m.get("modified") or {}).get("replaced") or (m.get("modified") or {}).get("implanted_pe")
+                or (m.get("modified") or {}).get("implanted_shc")]
+    if implants:
+        out.append(_det("Code implanted in memory", "high", ["T1055", "T1055.012"],
+                        "hollows_hunter found injected code, a hollowed image or shellcode in the sample's processes; "
+                        "the dumps were added to the case as samples.",
+                        [f"{Path(m['image'].replace(chr(92), '/')).name or '?'} (pid {m['pid']}): "
+                         + ", ".join(f"{k} {v}" for k, v in m["modified"].items() if v) for m in implants]))
+    hooks = [m for m in dyn.get("memory") or [] if m not in implants and any((m.get("modified") or {}).values())]
+    if hooks:
+        out.append(_det("Patched / hooked modules in memory", "medium", ["T1574", "T1056.004"],
+                        "Modules in the sample's processes were patched or had their import table hooked.",
+                        [f"{Path(m['image'].replace(chr(92), '/')).name or '?'} (pid {m['pid']}): "
+                         + ", ".join(f"{k} {v}" for k, v in m["modified"].items() if v) for m in hooks]))
+
+    for h in dyn.get("sigma") or []:
+        sev = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}.get(h.get("level"), "info")
+        desc = (h.get("description") or "Matched a SigmaHQ community rule.").strip()
+        if h.get("falsepositives"):
+            desc += " Known false positives: " + "; ".join(h["falsepositives"][:3]) + "."
+        out.append(_det(f"Sigma: {h['title']}", sev, h.get("attck") or [], desc + " (SigmaHQ, DRL 1.1)",
+                        h.get("evidence") or []))
+
     if dyn.get("early_finish"):
         out.append(_det("Monitor tampering suspected", "medium", ["T1562"],
                         "The report arrived before the observation window ended; the sample may have "
                         "interfered with the monitor, so treat this run's results with care.",
                         ["early report"]))
     return out
+
+
+EVASION_HINTS = ("anti-vm", "anti-analysis", "anti-debugging", "sandbox", "virtual machine", "sleep", "delay execution",
+                 "check if process is running under wine", "timing")
+
+
+def _evasion_rule(st: dict, dyn: dict) -> list[dict]:
+    """The sample's code shows anti-VM / anti-debug / long-sleep tricks, yet the detonation showed
+    next to nothing: it probably noticed the sandbox and played dead. A visibility warning, not
+    a safety one: try a longer run, or a dedicated dirty machine (DANGER MODE)."""
+    if not dyn.get("detonated"):
+        return []
+    beh = dyn.get("behavior") or {}
+    procs = [p for p in beh.get("processes") or [] if not p.get("launcher")] if beh else (dyn.get("new_processes") or [])
+    activity = (len(procs) + len(dyn.get("new_files") or []) + len(dyn.get("new_runkeys") or [])
+                + len(dyn.get("new_tasks") or []) + len(dyn.get("network") or []) + len(beh.get("registry") or [])
+                + len(beh.get("network") or []))
+    if activity > 2:
+        return []
+    caps = [c["name"] for c in ((st.get("capa") or {}).get("capabilities") or [])
+            if any(h in (c.get("namespace", "") + " " + c["name"]).lower() for h in EVASION_HINTS)]
+    imps = [i for i in (st.get("pe") or {}).get("suspicious_imports") or []
+            if any(x in i for x in ("IsDebuggerPresent", "CheckRemoteDebuggerPresent", "NtQueryInformationProcess"))]
+    evidence = caps + imps
+    if not evidence:
+        return []
+    return [_det("Sandbox evasion suspected", "medium", ["T1497", "T1622"],
+                 "The code contains anti-analysis checks, but the run showed almost no behaviour. The sample may have "
+                 "detected the sandbox and stayed quiet. Your PC was never at risk; the run just saw less. Try a longer "
+                 "run time, or a dedicated dirty machine in DANGER MODE.", evidence)]
 
 
 def evaluate(static_report: dict | None, dynamic_report: dict | None) -> dict:
@@ -275,6 +333,7 @@ def evaluate(static_report: dict | None, dynamic_report: dict | None) -> dict:
         dets += _static_rules(static_report)
     if dynamic_report:
         dets += _dynamic_rules(dynamic_report)
+        dets += _evasion_rule(static_report or {}, dynamic_report)
     dets.sort(key=lambda d: SEV_ORDER.get(d["severity"], 0), reverse=True)
     attck = sorted({t for d in dets for t in d["attck"]})
     max_sev = max((d["severity"] for d in dets), key=lambda s: SEV_ORDER[s], default="info")

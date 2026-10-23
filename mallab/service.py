@@ -240,11 +240,13 @@ class MalLab:
                                       tools_dir=self.tools_dir, safe_net=safe_net,
                                       simulate=simulate, host_guard=guard)
             dropped = report.pop("_dropped_blobs", None) or []
+            memdumps = report.pop("_memory_blobs", None) or []
             rel = f"dynamic-{run['id']}.json"
             (self.store.report_dir(s["sha256"]) / rel).write_text(
                 json.dumps(report, indent=2), encoding="utf-8")
             self.store.finish_run(run["id"], "done", report.get("verdict", ""), rel)
             self._ingest_dropped(s, dropped)
+            self._ingest_dropped(s, memdumps, "memory dump")
             self._emit(type="lab_run_done", run_id=run["id"], sample_id=sample_id,
                        verdict=report.get("verdict", ""))
             return self.store.get_run(run["id"])
@@ -257,14 +259,16 @@ class MalLab:
             self.detonating = False
             self.detonate_lock.release()
 
-    def _ingest_dropped(self, parent: dict, blobs: list[tuple[str, bytes]]):
-        """Add files the sample dropped to the parent's case as child samples (static triage only)."""
+    def _ingest_dropped(self, parent: dict, blobs: list[tuple[str, bytes]], kind: str = "dropped"):
+        """Add files the sample dropped (or memory dumps of its unpacked / injected code) to the
+        parent's case as child samples (static triage only)."""
         for path, data in blobs:
-            name = path.replace("/", "\\").rsplit("\\", 1)[-1][:200] or "dropped.bin"
+            name = (path if kind != "dropped" else path.replace("/", "\\").rsplit("\\", 1)[-1])[:200] or "dropped.bin"
+            source = f"dropped by {parent['filename']}" if kind == "dropped" else f"memory dump from {parent['filename']} run"
             try:
-                self.ingest(parent["case_id"], data, name, f"dropped by {parent['filename']}")
+                self.ingest(parent["case_id"], data, name, source)
             except Exception as e:
-                self._emit(type="lab_log", text=f"Could not ingest dropped file {name}: {e}")
+                self._emit(type="lab_log", text=f"Could not ingest {kind} {name}: {e}")
 
     def open_sandbox(self, sample_id: str | None = None) -> dict:
         """Open a hardened, network-off Windows Sandbox for hands-on work, optionally with one
@@ -490,6 +494,65 @@ class MalLab:
     def yara_delete(self, name: str):
         yara_rules.delete_rule(self.yara_dir, name)
 
+    def yara_packs(self) -> list[dict]:
+        packs = self.yara_dir / "packs"
+        files = sorted([*packs.glob("*.yar"), *packs.glob("*.yara"), *packs.glob("*.mlx")]) if packs.is_dir() else []
+        out = []
+        for f in files:
+            try:
+                raw = f.read_bytes()
+                text = (tooling.decode_pack(raw) if f.suffix == ".mlx" else raw).decode("utf-8", "replace")
+            except (OSError, ValueError):   # e.g. an old plain .yar that antivirus has locked
+                out.append({"name": f.name, "size": 0, "rule_count": 0, "error": "unreadable (quarantined by antivirus?)"})
+                continue
+            out.append({"name": f.name, "size": len(raw),
+                        "rule_count": len(re.findall(r"(?m)^\s*(?:private\s+|global\s+)*rule\s+\w+", text))})
+        return out
+
+    def retrohunt(self, name: str | None = None, text: str | None = None) -> dict:
+        """Scan every sample already in the lab with one rule file (or unsaved rule text): which
+        of my past samples does this new rule catch? Reads each quarantined file once, verified."""
+        try:
+            import yara
+        except ImportError as e:
+            raise RuntimeError("Retrohunt needs yara-python (bundled with the installed app).") from e
+        if text and text.strip():
+            try:
+                compiled = {"groups": [("unsaved rule", yara.compile(source=text))], "errors": [], "count": 1}
+            except Exception as e:
+                raise ValueError(f"rule does not compile: {e}") from e
+            label = "unsaved rule"
+        else:
+            if re.fullmatch(r"[A-Za-z0-9._-]+\.mlx", name or ""):   # an encoded pack
+                safe, f = name, self.yara_dir / "packs" / name
+            else:
+                safe = yara_rules._safe_name(name or "")
+                f = self.yara_dir / safe
+                if not f.is_file():
+                    f = self.yara_dir / "packs" / safe
+            if not f.is_file():
+                raise ValueError("no such rule file")
+            compiled = static.compiled_yara(self.yara_dir, only=[f])
+            if compiled["errors"]:
+                raise ValueError(compiled["errors"][0])
+            label = safe
+        t0, hits, scanned, seen = time.time(), [], 0, set()
+        for s in self.store.all_samples():
+            if s["sha256"] in seen:
+                continue
+            seen.add(s["sha256"])
+            try:
+                data = self.store.read_sample(s["sha256"])
+            except ValueError:
+                continue
+            scanned += 1
+            ms = static.yara_matches(data, compiled)
+            if ms:
+                hits.append({"id": s["id"], "case_id": s["case_id"], "case_name": s["case_name"], "filename": s["filename"],
+                             "sha256": s["sha256"], "risk": s.get("risk"), "rules": sorted({m["rule"] for m in ms})[:20]})
+        self._emit(type="lab_log", text=f"Retrohunt with {label}: {len(hits)} of {scanned} sample(s) matched")
+        return {"rule": label, "scanned": scanned, "matched": len(hits), "hits": hits, "seconds": round(time.time() - t0, 1)}
+
     # ---- Sysmon setup --------------------------------------------------
 
     def sysmon_status(self) -> dict:
@@ -516,6 +579,13 @@ class MalLab:
                 "fakenet": {"ready": bool(fakenet.find(self.tools_dir)),
                             "version": tooling.installed_version("fakenet", self.tools_dir)},
                 "sysmon": {"ready": (self.tools_dir / "Sysmon64.exe").exists()},
+                "hollows_hunter": {"ready": (self.tools_dir / "hollows_hunter64.exe").is_file(),
+                                   "version": tooling.installed_version("hollows_hunter", self.tools_dir)},
+                "sigma": {"ready": (self.tools_dir / "sigma").is_dir(),
+                          "version": tooling.installed_version("sigma", self.tools_dir),
+                          "rules": sum(1 for _ in (self.tools_dir / "sigma").rglob("*.yml")) if (self.tools_dir / "sigma").is_dir() else 0},
+                "yara_forge": {"ready": any((self.yara_dir / "packs").glob("*.yar")) if (self.yara_dir / "packs").is_dir() else False,
+                               "version": tooling.installed_version("yara_forge", self.tools_dir)},
                 "tlsh": {"ready": has_tlsh}}
 
     def setup_tool(self, tool: str) -> dict:
@@ -525,7 +595,7 @@ class MalLab:
         name = tooling.TOOLS.get(tool, {}).get("name", tool)
         self._emit(type="lab_log", text=f"Downloading {name} from its official GitHub release…")
         try:
-            res = tooling.install(tool, self.tools_dir)
+            res = tooling.install(tool, self.tools_dir, yara_dir=self.yara_dir)
         except PermissionError as e:
             raise RuntimeError(f"Could not write {name} into {self.tools_dir} ({e}). If Defender quarantined "
                                "it, allow it in Windows Security or exclude the tools folder, then retry.") from e

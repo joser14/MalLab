@@ -45,6 +45,9 @@ Name: "sandbox"; Description: "Turn on Windows Sandbox (needed to detonate sampl
 Name: "sysmon"; Description: "Sysmon from Microsoft Sysinternals (full process, network and registry events)"; GroupDescription: "Analysis tools, downloaded from their official sources:"
 Name: "capa"; Description: "capa from Mandiant (what a program's code is capable of, mapped to ATT&&CK)"; GroupDescription: "Analysis tools, downloaded from their official sources:"
 Name: "fakenet"; Description: "FakeNet-NG from Mandiant (the Simulated network mode: fake internet inside the sandbox)"; GroupDescription: "Analysis tools, downloaded from their official sources:"
+Name: "memscan"; Description: "hollows_hunter / pe-sieve (dumps injected and unpacked code; runs only inside the sandbox)"; GroupDescription: "Analysis tools, downloaded from their official sources:"
+Name: "sigma"; Description: "SigmaHQ community detection rules (thousands of behaviour detections)"; GroupDescription: "Analysis tools, downloaded from their official sources:"
+Name: "yaraforge"; Description: "YARA Forge curated public YARA rules"; GroupDescription: "Analysis tools, downloaded from their official sources:"
 Name: "actors"; Description: "Threat-group data from MITRE ATT&&CK, MISP Galaxy and Malpedia"; GroupDescription: "Analysis tools, downloaded from their official sources:"
 Name: "hostguard"; Description: "Turn on the host network guard: block the sandbox from reaching this PC (Windows will ask you to approve)"; GroupDescription: "Protection:"
 Name: "defender"; Description: "Exclude MalLab's sample folders from Microsoft Defender (Windows will ask you to approve)"; GroupDescription: "Protection:"; Flags: unchecked
@@ -64,6 +67,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: deskto
 Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-sysmon"; StatusMsg: "Downloading Sysmon from Microsoft Sysinternals..."; Tasks: sysmon; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-capa"; StatusMsg: "Downloading capa from Mandiant's GitHub releases..."; Tasks: capa; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-fakenet"; StatusMsg: "Downloading FakeNet-NG from Mandiant's GitHub releases..."; Tasks: fakenet; Flags: runasoriginaluser runhidden waituntilterminated
+Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-memscan"; StatusMsg: "Downloading hollows_hunter from its GitHub releases..."; Tasks: memscan; Flags: runasoriginaluser runhidden waituntilterminated
+Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-sigma"; StatusMsg: "Downloading SigmaHQ rules..."; Tasks: sigma; Flags: runasoriginaluser runhidden waituntilterminated
+Filename: "{app}\{#MyAppExe}"; Parameters: "--setup-yara-forge"; StatusMsg: "Downloading YARA Forge rules..."; Tasks: yaraforge; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{app}\{#MyAppExe}"; Parameters: "--import-actors"; StatusMsg: "Importing threat-group data (MITRE ATT&CK, MISP Galaxy, Malpedia)..."; Tasks: actors; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{app}\{#MyAppExe}"; Parameters: "--defender-exclude"; StatusMsg: "Adding the Defender exclusion (approve the Windows prompt)..."; Tasks: defender; Flags: runasoriginaluser waituntilterminated
 ; The guard needs the sandbox's network adapter, which appears only once Windows Sandbox is on (after

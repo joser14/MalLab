@@ -42,6 +42,13 @@ def test_only_the_lineage_is_the_samples_behaviour():
     assert "LSASS memory access" not in names and "Persistence via Run key" in names
 
 
+def test_background_process_before_the_launcher_is_not_the_samples():
+    # Seen on real Windows: SmartScreen started a moment before the launcher's own event.
+    beh = sysmon.parse([EVENTS[3]] + EVENTS[:3] + EVENTS[4:], MON, LAUNCH)
+    assert [p["name"] for p in beh["processes"]] == ["cmd.exe", "reg.exe", "whoami.exe"]
+    assert beh["lineage"]["pids"] == [LAUNCH, 20, 21]
+
+
 def test_injection_extends_the_lineage():
     events = EVENTS + [
         ev(8, SourceImage="cmd.exe", SourceProcessGuid="gL", TargetImage="explorer.exe", TargetProcessGuid="gX"),
