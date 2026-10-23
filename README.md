@@ -4,7 +4,25 @@ A standalone malware research lab for Windows. Drop in a sample (or a password-p
 archive), get static triage, detonate it in a disposable Windows Sandbox, and check its hash
 against threat-intel sources. Nothing runs on the host.
 
-## Run it
+## Download and install
+
+1. Open the repository's **Releases** page and download the latest `MalLab-Setup-<version>.exe`.
+2. Run it and follow the wizard. It installs everything MalLab needs (no Python required) and
+   offers to turn on Windows Sandbox and download the analysis tools.
+3. Windows may show **"Windows protected your PC"**, because the installer isn't code-signed.
+   Click **More info → Run anyway**.
+
+Optional: check the download against `SHA256SUMS.txt` from the same release:
+
+```
+Get-FileHash .\MalLab-Setup-1.2.1.exe -Algorithm SHA256
+```
+
+Requirements: Windows 10/11 **Pro, Enterprise or Education** (for Windows Sandbox) with
+virtualization enabled in the BIOS/UEFI. On Windows Home, static analysis, YARA and threat intel
+work, but samples can't be detonated.
+
+## Run from source (developers)
 
 ```
 pip install -r requirements.txt
@@ -25,6 +43,18 @@ sources during setup (Sysmon's licence doesn't allow bundling it; capa and FakeN
 GitHub release over HTTPS, checked against GitHub's SHA-256 when the release publishes one; capa's
 does, FakeNet-NG's current release predates that). Any step that fails is listed in Settings with a retry button,
 where every tool can also be downloaded or updated later.
+
+### Publishing a release (maintainers)
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`), not by hand:
+
+1. Bump `MyAppVersion` in `Installer/MalLab.iss` and the version in `Installer/version_info.txt`, commit.
+2. Tag and push: `git tag v1.2.3` then `git push origin v1.2.3`.
+
+The workflow checks the tag matches the app version, runs the tests, builds the installer on a
+clean Windows machine, and publishes it on the Releases page with `SHA256SUMS.txt`. To test a build
+without releasing, run the workflow manually from the Actions tab; the installer is attached to the
+run as an artifact.
 
 The server only answers requests from this computer: other machines, DNS-rebinding hosts and
 cross-site web pages are refused.

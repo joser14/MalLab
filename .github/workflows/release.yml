@@ -1,0 +1,71 @@
+# Builds MalLab's Windows installer on GitHub's own machines and publishes it as a Release, so
+# nobody needs Python, Inno Setup or the build script to install MalLab.
+#
+#   Release:  bump MyAppVersion in Installer/MalLab.iss (and version_info.txt), commit, then
+#             git tag v1.2.3 && git push origin v1.2.3
+#   Test build without releasing: Actions tab -> "Build and release" -> Run workflow
+#             (the installer is attached to that run as a downloadable artifact).
+
+name: Build and release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to create the Release and upload the installer
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path Installer/MalLab.iss -Pattern '#define MyAppVersion "([^"]+)"').Matches[0].Groups[1].Value
+          if ("v$ver" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} doesn't match MyAppVersion $ver in Installer/MalLab.iss"
+          }
+
+      - name: Run the tests
+        shell: pwsh
+        run: |
+          python -m pip install --quiet -r requirements.txt
+          python -m pytest -q
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build the app and installer
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File Installer/build.ps1
+
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem Installer/Output/*.exe | ForEach-Object {
+            "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii Installer/Output/SHA256SUMS.txt
+          Get-Content Installer/Output/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MalLab-installer
+          path: Installer/Output/*
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Installer/Output/*.exe
+            Installer/Output/SHA256SUMS.txt
+          generate_release_notes: true
