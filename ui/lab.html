@@ -1,0 +1,1443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MalLab</title>
+<style>
+/* MalLab design system: electric blue + violet, crisp edges, offset "riso" shadows, mono data labels.
+   Fonts (SIL OFL, bundled in ui/fonts): Space Grotesk (headings), Inter (text), JetBrains Mono (data). */
+@font-face { font-family: "Space Grotesk"; src: url(/fonts/space-grotesk.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: "Inter"; src: url(/fonts/inter.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url(/fonts/jetbrains-mono.woff2) format("woff2"); font-weight: 100 800; font-display: swap; }
+
+:root {
+  --bg: #f3f4fb; --dots: rgba(60, 50, 160, .10);
+  --surface: #ffffff; --raised: #f6f6fd; --hover: #eef0fc;
+  --line: #e2e3f2; --line2: #cfd1e8; --ink: #15132e;
+  --text: #15132e; --text2: #3e3b60; --muted: #6a6791; --faint: #a19fc2;
+  --blue: #2f5bff; --violet: #7a3cf0;
+  --grad: linear-gradient(115deg, #2f5bff 0%, #5a49ff 50%, #8a3cf0 100%);
+  --accent: #4a49f5; --accent-bg: #3d55ff; --accent-soft: rgba(74, 73, 245, .10);
+  --shadow: #cfc6ff; --shadow-strong: #15132e;
+  --red: #dc2f4a; --red-bg: #e3344f; --amber: #b8710a; --green: #0f9468;
+  --code: #f6f5fe;
+  --head: "Space Grotesk", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --r: 10px; --r-sm: 7px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0a17; --dots: rgba(150, 140, 255, .07);
+    --surface: #131228; --raised: #19183a; --hover: #211f49;
+    --line: #252348; --line2: #36336a; --ink: #e9e7ff;
+    --text: #edebff; --text2: #c4c1ea; --muted: #8f8cba; --faint: #5d5a88;
+    --accent: #8f95ff; --accent-bg: #4a63ff; --accent-soft: rgba(143, 149, 255, .14);
+    --shadow: #2a1f73; --shadow-strong: #000;
+    --red: #ff6b80; --red-bg: #e3344f; --amber: #f2b54a; --green: #3fdc9c; --code: #0f0e22;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0a17; --dots: rgba(150, 140, 255, .07);
+  --surface: #131228; --raised: #19183a; --hover: #211f49;
+  --line: #252348; --line2: #36336a; --ink: #e9e7ff;
+  --text: #edebff; --text2: #c4c1ea; --muted: #8f8cba; --faint: #5d5a88;
+  --accent: #8f95ff; --accent-bg: #4a63ff; --accent-soft: rgba(143, 149, 255, .14);
+  --shadow: #2a1f73; --shadow-strong: #000;
+  --red: #ff6b80; --red-bg: #e3344f; --amber: #f2b54a; --green: #3fdc9c; --code: #0f0e22;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg) radial-gradient(var(--dots) 1px, transparent 1.2px) 0 0 / 22px 22px fixed; color: var(--text);
+       font: 14px/1.6 var(--sans); -webkit-font-smoothing: antialiased; min-height: 100vh; font-feature-settings: "cv11", "ss01"; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+h1, h2, h3, p { margin: 0; }
+::selection { background: color-mix(in srgb, var(--violet) 28%, transparent); }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; border-radius: var(--r-sm); }
+.hidden { display: none !important; }
+
+/* buttons & inputs */
+button, .btn { font: 600 13px/1 var(--head); letter-spacing: .01em; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 34px; padding: 0 14px; border-radius: var(--r-sm); border: 1.5px solid var(--ink); background: var(--surface); color: var(--text);
+  cursor: pointer; white-space: nowrap; transition: transform .1s, box-shadow .1s, background .12s; text-decoration: none !important; }
+button:hover, .btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--shadow); }
+button:active, .btn:active { transform: none; box-shadow: none; }
+button.primary, .btn.primary { background: var(--grad); color: #fff; }
+button.primary:hover, .btn.primary:hover { box-shadow: 3px 3px 0 var(--shadow-strong); }
+button.danger { background: var(--red-bg); color: #fff; }
+button.danger:hover { box-shadow: 3px 3px 0 var(--shadow-strong); }
+button.ghost { background: transparent; border-color: transparent; color: var(--text2); }
+button.ghost:hover { background: var(--hover); color: var(--text); box-shadow: none; transform: none; }
+button.ghost.red { color: var(--red); }
+button.sm, .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+button.lg { height: 44px; padding: 0 24px; font-size: 15px; border-radius: var(--r); }
+button:disabled, button:disabled:hover { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+input, select, textarea { font: inherit; font-size: 13.5px; color: var(--text); background: var(--surface); border: 1.5px solid var(--line2);
+  border-radius: var(--r-sm); padding: 0 11px; height: 34px; min-width: 0; transition: border-color .12s, box-shadow .12s; }
+textarea { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.55; }
+select { padding-right: 6px; }
+input::placeholder, textarea::placeholder { color: var(--faint); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--violet); box-shadow: 3px 3px 0 var(--shadow); }
+input.mono-in { font-family: var(--mono); font-size: 12.5px; }
+
+.switch { position: relative; display: inline-block; width: 40px; height: 23px; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--raised); border: 1.5px solid var(--ink); transition: background .15s; }
+.switch span::after { content: ""; position: absolute; top: 2.5px; left: 2.5px; width: 15px; height: 15px; border-radius: 50%; background: var(--ink); transition: transform .15s, background .15s; }
+.switch input:checked + span { background: var(--grad); }
+.switch input:checked + span::after { transform: translateX(17px); background: #fff; }
+.switch input:focus-visible + span { outline: 2px solid var(--violet); outline-offset: 2px; }
+.switch input:disabled { cursor: not-allowed; }
+.switch input:disabled + span { opacity: .45; }
+
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; background: var(--surface); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 2px; gap: 2px; }
+.seg button { height: 27px; border: none; background: transparent; color: var(--muted); padding: 0 11px; font-size: 12px; border-radius: 5px; }
+.seg button:hover { color: var(--text); background: var(--hover); transform: none; box-shadow: none; }
+.seg button.on { background: var(--ink); color: var(--surface); }
+
+/* top bar */
+.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(14px) saturate(1.3); border-bottom: 1.5px solid var(--line2); }
+.top::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--grad); }
+.top-in { max-width: 1180px; margin: 0 auto; height: 62px; padding: 3px 24px 0; display: flex; align-items: center; gap: 26px; }
+.logo { display: flex; align-items: center; gap: 10px; font: 700 18px var(--head); letter-spacing: -.02em; color: var(--text); text-decoration: none !important; }
+.logo i { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--grad); box-shadow: 2px 2px 0 var(--shadow-strong); }
+.logo i svg { width: 16px; height: 16px; }
+.logo em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.nav { display: flex; gap: 2px; }
+.nav a { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 8px 12px; border-radius: 6px; text-decoration: none !important; position: relative; }
+.nav a:hover { color: var(--text); background: var(--hover); }
+.nav a.on { color: var(--text); }
+.nav a.on::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 1px; height: 3px; border-radius: 3px; background: var(--grad); }
+.status { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.stat { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: 6px; font: 500 11.5px var(--mono); color: var(--text2);
+  border: 1.5px solid var(--line2); background: var(--surface); text-decoration: none !important; white-space: nowrap; }
+.stat:hover { border-color: var(--violet); color: var(--text); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.ok { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.dot.bad { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+.dot.warn { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.dot.busy { background: var(--violet); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+#theme { width: 30px; padding: 0; font-size: 14px; }
+
+/* layout */
+main { max-width: 1180px; margin: 0 auto; padding: 36px 24px 90px; animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.page-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+.page-head > :first-child { flex: 1; min-width: 240px; }
+h1 { font: 700 32px/1.15 var(--head); letter-spacing: -.025em; }
+.page-head h1::before { content: "// "; font: 500 .55em var(--mono); vertical-align: .35em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sub { color: var(--muted); margin-top: 6px; max-width: 70ch; }
+.crumbs { display: flex; gap: 8px; align-items: center; font: 12px var(--mono); color: var(--faint); margin-bottom: 12px; flex-wrap: wrap; }
+.crumbs a { color: var(--muted); } .crumbs b { color: var(--text2); font-weight: 500; }
+.section-title { display: flex; align-items: baseline; gap: 12px; font: 600 16px var(--head); margin: 38px 0 12px; }
+.section-title a { font: 500 12px var(--mono); margin-left: auto; }
+.card { background: var(--surface); border: 1.5px solid var(--line2); border-radius: var(--r); padding: 20px; box-shadow: 5px 5px 0 var(--shadow); }
+.stack > * + * { margin-top: 18px; }
+.card.flush { padding: 0; overflow: hidden; }
+/* a card's leading h3 becomes its panel header, with a status light */
+.card h3 { display: flex; align-items: center; gap: 9px; font: 600 11.5px var(--mono); color: var(--text2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+.card > h3:first-child { margin: -20px -20px 16px; padding: 11px 18px; border-bottom: 1.5px solid var(--line); background: var(--raised); border-radius: var(--r) var(--r) 0 0; }
+.card h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--grad); flex: none; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.end { justify-content: flex-end; }
+.small { font-size: 12.5px; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.break { word-break: break-all; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 22px; align-items: start; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+/* drop zone + options */
+.drop { border: 2px dashed var(--line2); border-radius: 14px; padding: 46px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box; }
+.drop:hover, .drop.hot { border-color: var(--violet); background: var(--accent-soft); }
+.drop .ic { width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 14px; display: grid; place-items: center; background: var(--grad); color: #fff; box-shadow: 3px 3px 0 var(--shadow-strong); }
+.drop .ic svg { width: 21px; height: 21px; }
+.drop .t { font: 600 16px var(--head); }
+.drop .file { margin-top: 6px; font-family: var(--mono); font-size: 12.5px; color: var(--text2); }
+.drop.has { border-style: solid; border-color: var(--violet); }
+.drop.sm { padding: 22px 14px; }
+.drop.sm .t { font-size: 14px; }
+.opts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.5px; background: var(--line2); border: 1.5px solid var(--line2); border-radius: var(--r); overflow: hidden; margin-top: 18px; }
+.opt { background: var(--surface); padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.opt-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 600 13.5px var(--head); }
+.opt p { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.opt input.pw { height: 30px; font-family: var(--mono); font-size: 12px; }
+.runbar { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+.runbar .small { flex: 1; min-width: 200px; }
+
+/* notices */
+.notice { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px; border-radius: var(--r); border: 1.5px solid var(--line2); border-left: 4px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 6%, var(--surface)); margin-bottom: 20px; font-size: 13.5px; }
+.notice .nic { width: 20px; height: 20px; border-radius: 6px; flex: none; display: grid; place-items: center; font: 800 12px var(--mono); color: #fff; background: var(--grad); margin-top: 1px; }
+.notice details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 2px; }
+.notice details p { margin-top: 6px; color: var(--text2); font-family: var(--mono); font-size: 12px; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { text-align: left; font: 600 10.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .09em; padding: 11px 16px; border-bottom: 1.5px solid var(--line2); background: var(--raised); }
+td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tr.link { cursor: pointer; transition: background .1s; }
+tr.link:hover { background: var(--hover); box-shadow: inset 3px 0 0 var(--violet); }
+td.chev { color: var(--faint); text-align: right; width: 32px; font-family: var(--mono); }
+tr.link:hover td.chev { color: var(--violet); }
+.tbl { border: 1.5px solid var(--line2); border-radius: var(--r-sm); overflow: auto; }
+.empty { text-align: center; padding: 46px 20px; color: var(--muted); }
+.empty b { display: block; color: var(--text); font: 600 16px var(--head); margin-bottom: 4px; }
+.empty .btn, .empty button { margin-top: 14px; }
+
+/* risk & badges */
+.risk { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 23px; padding: 0 8px; border-radius: 5px; font: 700 12px var(--mono); font-variant-numeric: tabular-nums; border: 1.5px solid currentColor; }
+.risk.lo { color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.risk.mid { color: var(--amber); background: color-mix(in srgb, var(--amber) 11%, transparent); }
+.risk.hi { color: var(--red); background: color-mix(in srgb, var(--red) 11%, transparent); }
+.badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 5px; font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .05em;
+  background: var(--raised); color: var(--text2); border: 1px solid var(--line2); }
+.badge.hi, .badge.malicious, .badge.high { color: var(--red); background: color-mix(in srgb, var(--red) 11%, transparent); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.badge.mid, .badge.suspicious, .badge.medium { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); border-color: color-mix(in srgb, var(--amber) 40%, transparent); }
+.badge.lo, .badge.clean, .badge.ok { color: var(--green); background: color-mix(in srgb, var(--green) 11%, transparent); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.badge.low { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--mono); font-size: 11.5px; padding: 2px 8px; border-radius: 5px; background: var(--raised); border: 1px solid var(--line2); color: var(--text2); }
+a.chip:hover { border-color: var(--violet); color: var(--text); text-decoration: none; }
+.chip.attck { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
+
+/* sample page */
+.shead { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.shead .info { flex: 1; min-width: 240px; }
+.shead h1 { font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -.02em; word-break: break-all; margin-top: 6px; }
+.gauge { position: relative; flex: none; background: var(--surface); border-radius: 50%; box-shadow: 4px 4px 0 var(--shadow); }
+.gauge svg { transform: rotate(-90deg); display: block; }
+.gauge .n { position: absolute; inset: 0; display: grid; place-items: center; font: 700 1em var(--head); font-variant-numeric: tabular-nums; }
+.tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--line2); margin: 22px 0 26px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { padding: 11px 14px; font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: -1.5px;
+  border-bottom: 3px solid transparent; white-space: nowrap; text-decoration: none !important; }
+.tabs a:hover { color: var(--text); }
+.tabs a.on { color: var(--text); border-image: var(--grad) 1; border-bottom-width: 3px; border-bottom-style: solid; }
+.tabs .n { font-size: 10.5px; color: #fff; background: var(--grad); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px 16px; font-size: 13.5px; align-items: baseline; }
+.kv .k { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.copyable { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.copyable .mono { word-break: break-all; }
+.copy { height: auto; padding: 1px 6px; border: 1px solid var(--line2); border-radius: 4px; background: none; font: 500 10.5px var(--mono); color: var(--muted); }
+.copy:hover { color: var(--violet); border-color: var(--violet); transform: none; box-shadow: none; }
+.reasons { display: grid; gap: 8px; }
+.reasons div { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; }
+.reasons div::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--grad); flex: none; transform: translateY(-2px); }
+.det { padding: 15px 18px; border-top: 1px solid var(--line); }
+.det .row b { font: 600 14px var(--head); }
+.det p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+pre { margin: 0; background: var(--code); border: 1px solid var(--line2); border-radius: var(--r-sm); padding: 10px 12px; font: 12px/1.6 var(--mono); color: var(--text2); white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; }
+.sect { border-top: 1px solid var(--line); }
+.card.flush > .sect:first-child { border-top: none; }
+.sect > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 14px 18px; font: 600 14px var(--head); user-select: none; }
+.sect > summary::-webkit-details-marker { display: none; }
+.sect > summary::after { content: "+"; margin-left: auto; font: 500 16px var(--mono); color: var(--muted); }
+.sect[open] > summary::after { content: "–"; color: var(--violet); }
+.sect > summary:hover { background: var(--hover); }
+.sect > div { padding: 0 18px 18px; display: grid; gap: 10px; }
+.sublabel { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-top: 8px; }
+.none { color: var(--faint); font-size: 13px; }
+.ptree, .ptree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1.5px dashed var(--line2); }
+.ptree { padding-left: 4px; border: none; }
+.ptree li { padding: 4px 0; }
+.shot { max-width: 100%; border-radius: var(--r-sm); border: 1.5px solid var(--line2); box-shadow: 4px 4px 0 var(--shadow); }
+.log { background: var(--code); border: 1px solid var(--line2); border-radius: var(--r-sm); padding: 10px 12px; font: 12px/1.7 var(--mono); color: var(--text2); max-height: 220px; overflow: auto; margin-top: 12px; }
+.log div { display: flex; gap: 12px; } .log .ts { color: var(--faint); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line2); border-top-color: var(--violet); border-right-color: var(--blue); border-radius: 50%; animation: sp .7s linear infinite; flex: none; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* intel */
+.igrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.prov { border: 1.5px solid var(--line2); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 6px; align-content: start; background: var(--surface); box-shadow: 4px 4px 0 var(--shadow); }
+.prov.off { opacity: .55; box-shadow: none; }
+.prov .ph { display: flex; align-items: center; gap: 8px; font: 600 14px var(--head); flex-wrap: wrap; }
+.prov .ph a { margin-left: auto; font: 500 11.5px var(--mono); }
+.prov .ps { font: 700 22px var(--head); font-variant-numeric: tabular-nums; }
+
+/* rules */
+.rules { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 520px; }
+.rlist { border-right: 1.5px solid var(--line2); overflow: auto; background: var(--raised); }
+.rlist a { display: block; padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none !important; }
+.rlist a:hover { background: var(--hover); }
+.rlist a.on { background: var(--surface); box-shadow: inset 3px 0 0 var(--violet); }
+.rlist .mono { display: block; }
+.editor { display: flex; flex-direction: column; min-width: 0; }
+.editor .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1.5px solid var(--line2); }
+.editor .body { display: grid; grid-template-columns: auto 1fr; flex: 1; background: var(--code); }
+.gutter { padding: 14px 10px 14px 14px; text-align: right; color: var(--faint); font: 12.5px/1.65 var(--mono); user-select: none; white-space: pre; overflow: hidden; border-right: 1px solid var(--line2); }
+#yr-text { border: none; border-radius: 0; background: transparent; box-shadow: none; font: 12.5px/1.65 var(--mono); padding: 14px; min-height: 460px; width: 100%; white-space: pre; overflow: auto; tab-size: 4; resize: none; }
+.kbd { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+/* settings */
+.set { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; padding: 28px 0; border-top: 1.5px dashed var(--line2); }
+.page-head + .set { border-top: none; padding-top: 4px; }
+.set h2 { font: 600 17px var(--head); letter-spacing: -.01em; }
+.set .sub { font-size: 13px; }
+.field { display: grid; gap: 6px; }
+.field + .field { margin-top: 14px; }
+.field label { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toggle-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid var(--line2); border-radius: var(--r); background: var(--surface); box-shadow: 4px 4px 0 var(--shadow); }
+.toggle-row b { display: block; font: 600 14px var(--head); }
+
+/* toasts + dialog */
+.toasts { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: grid; gap: 10px; }
+.toast { background: var(--surface); color: var(--text); border: 1.5px solid var(--ink); border-radius: var(--r); padding: 11px 15px; font-size: 13.5px;
+  box-shadow: 4px 4px 0 var(--shadow); max-width: 390px; animation: fade .2s ease; display: flex; gap: 10px; align-items: baseline; }
+.toast::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--green); flex: none; transform: translateY(-1px); }
+.toast.err::before { background: var(--red); }
+dialog { border: 1.5px solid var(--ink); border-radius: 14px; background: var(--grad) top / 100% 5px no-repeat, var(--surface); color: var(--text); padding: 0;
+  width: min(470px, calc(100vw - 32px)); box-shadow: 8px 8px 0 var(--shadow); }
+dialog::backdrop { background: rgba(11, 10, 30, .55); backdrop-filter: blur(3px); }
+dialog .dbody { padding: 26px 24px 6px; }
+dialog h2 { font: 700 19px var(--head); letter-spacing: -.01em; margin-bottom: 10px; }
+dialog .dtext { color: var(--text2); font-size: 13.5px; display: grid; gap: 10px; }
+dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 24px 22px; }
+
+/* ATT&CK matrix, timeline, groups */
+.matrix { display: flex; gap: 10px; overflow-x: auto; padding: 2px 6px 8px 2px; }
+.mcol { min-width: 152px; flex: 1; display: grid; gap: 7px; align-content: start; }
+.mh { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--text2); padding-bottom: 6px; border-bottom: 2px solid; border-image: var(--grad) 1; }
+.mt { display: block; padding: 8px 10px; border: 1.5px solid var(--line2); border-left-width: 4px; border-radius: var(--r-sm); font-size: 12.5px; color: var(--text); text-decoration: none; background: var(--surface); transition: transform .1s, box-shadow .1s; }
+.mt:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--shadow); text-decoration: none; }
+.mt b { display: block; font: 600 11px var(--mono); color: var(--muted); }
+.mt.high { border-left-color: var(--red); } .mt.medium { border-left-color: var(--amber); } .mt.low { border-left-color: var(--blue); } .mt.info { border-left-color: var(--violet); }
+.tl { display: grid; gap: 0; }
+.tl > div { display: grid; grid-template-columns: 150px 96px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.tl .kind { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--violet); }
+.lead { padding: 13px 15px; border: 1.5px solid var(--line2); border-radius: var(--r); display: grid; gap: 6px; background: var(--surface); }
+.lead + .lead { margin-top: 10px; }
+.top .status button.sm { margin-right: 4px; }
+@media (max-width: 680px) { .tl > div { grid-template-columns: 1fr; gap: 2px; } }
+
+@media (max-width: 1200px) {
+  .top-in { gap: 18px; }
+  .stat .lbl { display: none; }   /* lights only; the label stays in the tooltip */
+  .stat { padding: 0 9px; }
+}
+@media (max-width: 960px) {
+  .split { grid-template-columns: 1fr; }
+  .opts { grid-template-columns: 1fr 1fr; }
+  .set { grid-template-columns: 1fr; gap: 14px; }
+}
+@media (max-width: 680px) {
+  .top-in { height: auto; padding: 12px 16px 10px; flex-wrap: wrap; gap: 10px 16px; }
+  .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  main { padding: 24px 16px 60px; }
+  .opts, .two { grid-template-columns: 1fr; }
+  .rules { grid-template-columns: 1fr; }
+  .rlist { border-right: none; border-bottom: 1.5px solid var(--line2); max-height: 220px; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; } .kv .k { margin-top: 8px; }
+  h1 { font-size: 25px; }
+  td, th { padding-left: 12px; padding-right: 12px; }
+  .hide-sm { display: none; }
+  .card { box-shadow: 3px 3px 0 var(--shadow); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <a class="logo" href="#/"><i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg></i><span>Mal<em>Lab</em></span></a>
+  <nav class="nav">
+    <a href="#/" data-nav="analyze">Analyze</a>
+    <a href="#/cases" data-nav="cases">Cases</a>
+    <a href="#/actors" data-nav="actors">Groups</a>
+    <a href="#/rules" data-nav="rules">Rules</a>
+    <a href="#/settings" data-nav="settings">Settings</a>
+  </nav>
+  <div class="status">
+    <button class="sm" id="open-sb" title="Open a hardened Windows Sandbox: networking off, no GPU, clipboard/audio/video/printer disconnected">Open Sandbox</button>
+    <a class="stat" href="#/settings" id="st-sb" title="Windows Sandbox"><span class="dot"></span><span class="lbl">Sandbox</span></a>
+    <a class="stat" href="#/settings" id="st-def" title="Microsoft Defender"><span class="dot"></span><span class="lbl">Defender</span></a>
+    <a class="stat" href="#/settings" id="st-ti" title="Threat-intel sources"><span class="dot"></span><span class="lbl">Intel</span></a>
+    <button class="sm ghost" id="theme" title="Switch light / dark" aria-label="Switch light or dark theme">◐</button>
+  </div>
+</div></header>
+
+<main id="main"></main>
+
+<dialog id="dlg"><div class="dbody"><h2 id="dlg-title"></h2><div class="dtext" id="dlg-body"></div></div>
+  <div class="dfoot"><button id="dlg-cancel">Cancel</button><button id="dlg-ok" class="primary">OK</button></div></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+// ============================================================ helpers
+const $ = (id) => document.getElementById(id);
+const main = $("main");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const api = (p, body) => fetch(p, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+  .then(async (r) => { try { return await r.json(); } catch { return { error: `Server error (${r.status})` }; } })
+  .catch((e) => ({ error: "Can't reach the lab service: " + e.message }));
+const fmtDate = (t) => t ? new Date(t * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
+const fmtSize = (n) => n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`;
+const riskClass = (r) => r >= 60 ? "hi" : r >= 25 ? "mid" : "lo";
+const riskWord = (r) => r >= 60 ? "Malicious" : r >= 25 ? "Suspicious" : "Low risk";
+const riskBadge = (r) => `<span class="risk ${riskClass(r || 0)}">${r || 0}</span>`;
+const cap = (s) => s ? String(s)[0].toUpperCase() + String(s).slice(1) : "";
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const now = () => new Date().toLocaleTimeString([], { hour12: false });
+const store = { get(k, d) { try { const v = localStorage.getItem("mallab." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v) { try { localStorage.setItem("mallab." + k, JSON.stringify(v)); } catch {} } };
+const ICON_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>`;
+
+function toast(text, err) {
+  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.textContent = text;
+  $("toasts").appendChild(t); setTimeout(() => t.remove(), err ? 6000 : 2800);
+}
+function ask({ title, body, ok = "Confirm", danger = false, cancel = "Cancel" }) {
+  return new Promise((resolve) => {
+    const d = $("dlg");
+    $("dlg-title").textContent = title; $("dlg-body").innerHTML = body;
+    $("dlg-ok").textContent = ok; $("dlg-ok").className = danger ? "danger" : "primary";
+    $("dlg-cancel").textContent = cancel;
+    const done = (v) => { d.close(); resolve(v); };
+    $("dlg-ok").onclick = () => done(true); $("dlg-cancel").onclick = () => done(false);
+    d.oncancel = (e) => { e.preventDefault(); done(false); };
+    d.showModal(); $("dlg-cancel").focus();
+  });
+}
+const copyBtn = (text) => `<button class="copy" data-copy="${esc(text)}">copy</button>`;
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); toast("Copied"); } catch { toast("Clipboard not available", true); }
+});
+const sw = (id, on, extra = "") => `<label class="switch"><input type="checkbox" id="${id}" ${on ? "checked" : ""} ${extra}><span></span></label>`;
+const seg = (id, opts, val) => `<div class="seg" id="${id}" role="radiogroup">${opts.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === val}" data-v="${v}" class="${v === val ? "on" : ""}">${l}</button>`).join("")}</div>`;
+function wireSeg(id, onChange) {
+  $(id).querySelectorAll("button").forEach((b) => b.onclick = () => {
+    $(id).querySelectorAll("button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", x === b); });
+    onChange(b.dataset.v);
+  });
+}
+function setupDrop(zone, input, onFiles) {
+  zone.onclick = () => input.click();
+  zone.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
+  zone.ondragover = (e) => { e.preventDefault(); zone.classList.add("hot"); };
+  zone.ondragleave = () => zone.classList.remove("hot");
+  zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove("hot"); if (e.dataTransfer.files.length) onFiles([...e.dataTransfer.files]); };
+  input.onchange = () => { if (input.files.length) onFiles([...input.files]); input.value = ""; };
+}
+const isArchive = (n) => /\.(7z|zip)$/i.test(n);
+function gauge(r, size = 72) {
+  const v = Math.max(0, Math.min(100, +r || 0)), rad = 42, c = 2 * Math.PI * rad;
+  const col = { hi: "var(--red)", mid: "var(--amber)", lo: "var(--green)" }[riskClass(v)];
+  return `<div class="gauge" style="width:${size}px;height:${size}px" title="Risk ${v} of 100"><svg viewBox="0 0 100 100" width="${size}" height="${size}">
+    <circle cx="50" cy="50" r="${rad}" fill="none" stroke="var(--line)" stroke-width="8"/>
+    <circle cx="50" cy="50" r="${rad}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c * v / 100} ${c}"/></svg>
+    <div class="n" style="font-size:${Math.round(size * .3)}px;color:${col}">${v}</div></div>`;
+}
+const list = (arr, empty = "None") => arr && arr.length ? `<pre>${esc(arr.join("\n"))}</pre>` : `<div class="none">${empty}</div>`;
+const sect = (title, open, inner) => `<details class="sect" ${open ? "open" : ""}><summary>${title}</summary><div>${inner}</div></details>`;
+const timeOpts = (sel) => ["30", "60", "120", "180", "300"].map((t) => `<option value="${t}" ${t === sel ? "selected" : ""}>${t} s</option>`).join("");
+const NET_OPTS = [["off", "Off"], ["sim", "Simulated"], ["inet", "Internet"], ["full", "Full"]];
+const NET_HINT = { off: "No network inside the VM.", sim: "Fake DNS and HTTP inside the VM (FakeNet-NG). Nothing real leaves.",
+  inet: "Internet only. Your LAN and this PC are blocked.", full: "Unrestricted, including your LAN." };
+// Detonation request fields for a network mode.
+const netBody = (net) => ({ networking: net !== "off", safe_net: net !== "full", simulate: net === "sim" });
+const guardOn = () => !!(LAB && LAB.netguard && LAB.netguard.enabled);
+const guardNote = () => guardOn() ? `<p>The host network guard is on: this PC's firewall blocks the sandbox's network from reaching this PC.</p>`
+  : `<p style="color:var(--red)"><b>The host network guard is off.</b> The sandbox can reach services running on this PC. Turn it on in <a href="#/settings">Settings</a> first.</p>`;
+async function netAsk(net) {
+  if (net === "sim") {
+    if (!(LAB && LAB.fakenet && LAB.fakenet.ready)) { toast("Simulated network needs FakeNet-NG in the lab's tools folder. See Settings > Analysis tools.", true); return false; }
+    return ask({ title: "Run on a simulated network?", ok: "Run simulated", danger: !guardOn(),
+      body: `<p>The VM gets a network adapter, but FakeNet-NG inside it answers every DNS lookup and connection with fake services, so the sample's requests are recorded and never reach the internet.</p>
+        <p>FakeNet runs inside the VM, where the sample is administrator. If FakeNet stops, the monitor switches the VM's adapters off and the run is flagged, but a determined sample could get traffic out.</p>${guardNote()}` });
+  }
+  return ask({ title: net === "full" ? "Allow full network access?" : "Allow internet access?", ok: "Run with network", danger: true,
+    body: `<p>The sample will be able to reach the internet, including real command-and-control servers, and those servers will see your public IP.</p><p>${net === "full" ? "<b>Your local network is not blocked.</b>" : "A firewall rule inside the VM blocks your local network and this PC, and the run is refused if it can't be applied. The sample runs as administrator inside the VM, so a determined sample could remove that rule."}</p>${guardNote()}` });
+}
+
+// Hardened interactive sandbox (header button + "Open in sandbox" on a sample page).
+async function openSandbox(sampleId, name) {
+  const ok = await ask({ title: sampleId ? `Open ${name} in Windows Sandbox?` : "Open Windows Sandbox?", ok: "Open sandbox",
+    body: `<p>Starts a disposable Windows Sandbox with the lab's protections: <b>networking off</b>, no GPU sharing, and clipboard, audio, video and printer disconnected from this PC.</p>
+      ${sampleId ? `<p>The sample is placed read-only in <span class="mono">Desktop\\input</span>. Running it there is your call. Nothing runs on this PC.</p>` : ""}
+      <p>On logon the VM checks it can't see your GPU or reach a network, and powers itself off if it can. Everything is wiped when you close the window.</p>` });
+  if (!ok) return;
+  const r = await api("/api/lab/sandbox/open", sampleId ? { sample_id: sampleId } : {});
+  if (r.error) return toast(r.error, true);
+  toast("Windows Sandbox is starting…");
+}
+
+// ATT&CK matrix: techniques grouped by tactic.
+const matrixHtml = (m) => !m || !m.length ? `<div class="none">No techniques observed yet.</div>` :
+  `<div class="matrix">${m.map((col) => `<div class="mcol"><div class="mh">${esc(col.tactic)}</div>${col.techniques.map((t) =>
+    `<a class="mt ${esc(t.severity)}" target="_blank" rel="noopener" href="https://attack.mitre.org/techniques/${esc(t.id.replace(".", "/"))}/" title="${esc(t.detections.join("\n"))}"><b>${esc(t.id)}</b>${esc(t.name)}</a>`).join("")}</div>`).join("")}</div>`;
+const download = async (url, fallback) => {
+  const r = await fetch(url); if (!r.ok) { const j = await r.json().catch(() => ({})); return toast(j.error || "Download failed", true); }
+  const cd = r.headers.get("content-disposition") || "", m = cd.match(/filename="([^"]+)"/);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = m ? m[1] : fallback; a.click(); URL.revokeObjectURL(a.href);
+};
+// Provider details -> short "key: value" strings (scalars and non-empty lists only).
+const detailBits = (d) => Object.entries(d || {}).filter(([, v]) => Array.isArray(v) ? v.length : v != null && v !== "" && typeof v !== "object")
+  .slice(0, 5).map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.slice(0, 6).join(", ") : v}`);
+const verdictBadge = (v) => `<span class="badge ${v === "malicious" ? "malicious" : v === "suspicious" ? "suspicious" : v === "clean" ? "clean" : ""}">${esc(cap(v))}</span>`;
+
+// ============================================================ state
+let LAB = null;
+let cur = {};
+const OPTS = Object.assign({ exec: true, timeout: "60", net: "off", unpack: true }, store.get("opts", {}), { pw: "" });
+const saveOpts = () => store.set("opts", { exec: OPTS.exec, timeout: OPTS.timeout, net: OPTS.net, unpack: OPTS.unpack });
+const Q = { file: null, running: false, status: "", log: [], started: 0, done: null };
+const DETONATING = {}, INTEL = {};
+let UNPACK = null;      // {sid, archive, siblings} from the last quick run
+let SAMPLE = null;      // data for the open sample page
+
+async function refreshState() {
+  const s = await api("/api/lab/state");
+  if (s.error) return;
+  LAB = s;
+  const sb = LAB.sandbox || {};
+  setStat("st-sb", sb.busy ? "busy" : sb.available ? "ok" : "bad", sb.busy ? "Sandbox busy" : sb.available ? "Sandbox" : "Sandbox off");
+  const df = LAB.defender || {};
+  setStat("st-def", !df.available ? "" : df.excluded ? "ok" : "warn",
+    !df.available ? "Defender n/a" : df.excluded ? "Lab excluded" : "Defender scanning",
+    !df.available ? "Microsoft Defender not detected" : df.excluded ? "The lab's sample folders are excluded from Defender" : "Defender may delete samples in the lab. Change this in Settings.");
+  const ti = LAB.intel || [], on = ti.filter((p) => p.configured).length;
+  setStat("st-ti", ti.some((p) => p.key_set) ? "ok" : "", `Intel ${on}/${ti.length}`);
+  $("open-sb").disabled = !sb.available || sb.busy;
+}
+function setStat(id, cls, label, title) {
+  const el = $(id); el.querySelector(".dot").className = "dot " + cls; el.querySelector(".lbl").textContent = label;
+  el.title = title || label;
+}
+
+// ============================================================ router
+function setNav(n) { document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("on", a.dataset.nav === n)); }
+function route() {
+  const h = location.hash || "#/";
+  let m;
+  if ((m = h.match(/^#\/case\/([\w-]+)\/sample\/([\w-]+)(?:\/(\w+))?$/))) return viewSample(m[1], m[2], m[3] || "overview");
+  if ((m = h.match(/^#\/case\/([\w-]+)$/))) return viewCase(m[1]);
+  if ((m = h.match(/^#\/actor\/([\w-]+)$/))) return viewActor(m[1]);
+  if (h === "#/actors") return viewActors();
+  if (h === "#/cases") return viewCases();
+  if (h === "#/rules") return viewRules();
+  if (h === "#/settings") return viewSettings();
+  return viewHome();
+}
+window.addEventListener("hashchange", route);
+function page(html, keepScroll) {
+  main.innerHTML = html;
+  if (!keepScroll) { main.style.animation = "none"; void main.offsetWidth; main.style.animation = ""; window.scrollTo(0, 0); }
+}
+const loading = () => page(`<div class="empty"><span class="spin"></span></div>`);
+function wireRows() { main.querySelectorAll("tr[data-href]").forEach((tr) => tr.onclick = () => location.hash = tr.dataset.href); }
+
+// ============================================================ Analyze (home)
+function viewHome() {
+  setNav("analyze"); cur = { view: "home" };
+  const sb = (LAB && LAB.sandbox) || {};
+  const recent = ((LAB && LAB.cases) || []).slice().sort((a, b) => b.created - a.created).slice(0, 5);
+  page(`
+  <div class="page-head"><div><h1>Analyze a sample</h1>
+    <p class="sub">Each file is quarantined and triaged, then run in a disposable, network-isolated Windows Sandbox that's wiped afterward. Nothing runs on this PC.</p></div></div>
+  ${LAB && !sb.available ? `<div class="notice"><span class="nic">!</span><div class="grow"><b>Windows Sandbox is off.</b> Static analysis still works: switch off “Execute in sandbox” below.
+    <details><summary>How to turn it on</summary><p>${esc(sb.message || "")}</p></details></div></div>` : ""}
+  <div class="card">
+    <div class="drop ${Q.file ? "has" : ""}" id="drop" tabindex="0" role="button" aria-label="Choose a file to analyze">
+      <div class="ic">${ICON_UP}</div>
+      <div class="t">Drop a file here or click to browse</div>
+      <div class="file" id="drop-file">${Q.file ? esc(`${Q.file.name} · ${fmtSize(Q.file.size)}`) : '<span class="small" style="font-family:var(--sans)">Executables, documents, scripts, or a .zip / .7z archive</span>'}</div>
+      <input type="file" id="file" hidden>
+    </div>
+    <div class="opts">
+      <div class="opt"><div class="opt-h">Execute in sandbox ${sw("o-exec", OPTS.exec)}</div><p>Off means static triage only. Nothing is run.</p></div>
+      <div class="opt"><div class="opt-h">Run time <select id="o-timeout">${timeOpts(OPTS.timeout)}</select></div><p>How long the sample runs before the VM is wiped.</p></div>
+      <div class="opt"><div class="opt-h">Network</div>${seg("o-net", NET_OPTS, OPTS.net)}<p id="o-net-hint"></p></div>
+      <div class="opt"><div class="opt-h">Unpack archives ${sw("o-unpack", OPTS.unpack)}</div><input class="pw" id="o-pw" placeholder="password: infected" autocomplete="off" spellcheck="false" aria-label="Archive password"></div>
+    </div>
+    <div class="runbar"><span class="small" id="run-hint"></span><button class="lg" id="run"></button></div>
+  </div>
+  <div id="q-progress"></div>
+  <div class="section-title">Recent cases ${recent.length ? `<a href="#/cases">All cases →</a>` : ""}</div>
+  ${recent.length ? `<div class="card flush"><table><tbody>${recent.map((c) => `<tr class="link" data-href="#/case/${c.id}"><td><b>${esc(c.name)}</b></td><td class="small">${plural(c.sample_count, "sample")}</td><td class="small hide-sm">${fmtDate(c.created)}</td><td class="chev">›</td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="card"><div class="empty" style="padding:20px"><b>No cases yet</b>Files you analyze here are kept in a “Quick Detonate” case.</div></div>`}`);
+  wireRows();
+  $("o-pw").value = OPTS.pw;
+  setupDrop($("drop"), $("file"), ([f]) => { Q.file = f; Q.done = null; Q.log = []; $("drop").classList.add("has"); $("drop-file").textContent = `${f.name} · ${fmtSize(f.size)}`; syncRun(); renderProgress(); });
+  $("o-exec").onchange = () => { OPTS.exec = $("o-exec").checked; saveOpts(); syncRun(); };
+  $("o-timeout").onchange = () => { OPTS.timeout = $("o-timeout").value; saveOpts(); };
+  $("o-unpack").onchange = () => { OPTS.unpack = $("o-unpack").checked; saveOpts(); syncRun(); };
+  $("o-pw").oninput = () => { OPTS.pw = $("o-pw").value; };
+  wireSeg("o-net", (v) => { OPTS.net = v; saveOpts(); syncRun(); });
+  $("run").onclick = runQuick;
+  syncRun(); renderProgress();
+}
+function syncRun() {
+  const b = $("run"); if (!b) return;
+  b.className = "lg " + (OPTS.exec ? "danger" : "primary");
+  b.innerHTML = Q.running ? `<span class="spin"></span> Running` : OPTS.exec ? "Detonate" : "Analyze";
+  b.disabled = !Q.file || Q.running;
+  $("o-net-hint").textContent = (NET_HINT[OPTS.net] || "") + (OPTS.net !== "off" && LAB && !guardOn() ? " Host network guard is off." : "");
+  $("o-timeout").disabled = !OPTS.exec;
+  $("o-net").querySelectorAll("button").forEach((x) => x.disabled = !OPTS.exec);
+  $("o-pw").disabled = !OPTS.unpack;
+  $("run-hint").textContent = !Q.file ? "Choose a file to begin."
+    : isArchive(Q.file.name) && OPTS.unpack ? "Archive: every file inside is triaged" + (OPTS.exec ? " and the riskiest one is run." : ".") : "";
+}
+async function runQuick() {
+  if (!Q.file || Q.running) return;
+  if (OPTS.exec && !(LAB && LAB.sandbox.available)) return toast("Windows Sandbox isn't enabled. Switch off “Execute in sandbox” for static analysis.", true);
+  if (OPTS.exec && OPTS.net !== "off" && !await netAsk(OPTS.net)) return;
+  Object.assign(Q, { running: true, status: OPTS.exec ? "Detonating" : "Analyzing", log: [], started: Date.now(), done: null });
+  syncRun(); renderProgress();
+  const nb = netBody(OPTS.exec ? OPTS.net : "off");
+  const qs = new URLSearchParams({ timeout: OPTS.timeout, detonate: OPTS.exec ? "1" : "0", networking: nb.networking ? "1" : "0", safe_net: nb.safe_net ? "1" : "0", simulate: nb.simulate ? "1" : "0" });
+  const r = await fetch("/api/lab/quick?" + qs, { method: "POST", body: await Q.file.arrayBuffer(),
+    headers: { "X-Filename": Q.file.name, "X-Unpack": OPTS.unpack ? "1" : "0", "X-Archive-Password": encodeURIComponent((OPTS.pw || "").trim()) } })
+    .then((x) => x.json()).catch((e) => ({ error: String(e) }));
+  if (r.error) quickDone({ error: r.error });
+}
+function renderProgress() {
+  const box = $("q-progress"); if (!box) return;
+  if (!Q.running && !Q.log.length && !Q.done) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="margin-top:16px"><div class="row">
+      ${Q.running ? `<span class="spin"></span>` : ""}<b class="grow">${esc(Q.status)}${Q.running ? "…" : ""}</b>
+      <span class="small mono" id="q-elapsed"></span>${Q.done ? `<a class="btn primary sm" href="${Q.done}">Open report →</a>` : ""}</div>
+    ${Q.log.length ? `<div class="log" id="q-log">${Q.log.map((l) => `<div><span class="ts">${l.t}</span><span>${esc(l.text)}</span></div>`).join("")}</div>` : ""}</div>`;
+  if ($("q-log")) $("q-log").scrollTop = 1e9;
+  tickElapsed();
+}
+function tickElapsed() { const el = $("q-elapsed"); if (el && Q.running) el.textContent = Math.round((Date.now() - Q.started) / 1000) + "s"; }
+setInterval(tickElapsed, 1000);
+function quickDone(e) {
+  Q.running = false;
+  if (e.error) { Q.status = "Failed"; Q.log.push({ t: now(), text: e.error }); toast(e.error, true); }
+  else {
+    const { sample, archive, siblings } = e.result;
+    Q.status = "Done"; Q.done = `#/case/${sample.case_id}/sample/${sample.id}`;
+    UNPACK = archive ? { sid: sample.id, archive, siblings } : null;
+    refreshState();
+    if (cur.view === "home") { location.hash = Q.done; return; }
+    toast(`Analysis of ${sample.filename} is ready`);
+  }
+  if (cur.view === "home") { syncRun(); renderProgress(); }
+}
+
+// ============================================================ Cases
+async function viewCases() {
+  setNav("cases"); cur = { view: "cases" };
+  await refreshState();
+  if (cur.view !== "cases") return;
+  const cases = ((LAB && LAB.cases) || []).slice().sort((a, b) => b.created - a.created);
+  page(`
+  <div class="page-head"><div><h1>Cases</h1><p class="sub">A case groups the samples, detonation runs and notes for one investigation.</p></div>
+    <div class="row"><input id="nc-name" placeholder="New case name" style="width:240px" aria-label="New case name"><button class="primary" id="nc-create">Create case</button></div></div>
+  <div class="card flush">${cases.length ? `<table><thead><tr><th>Name</th><th>Samples</th><th class="hide-sm">Created</th><th></th></tr></thead><tbody>
+    ${cases.map((c) => `<tr class="link" data-href="#/case/${c.id}"><td><b>${esc(c.name)}</b></td><td>${c.sample_count}</td><td class="small hide-sm">${fmtDate(c.created)}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty"><b>No cases yet</b>Create one above, or analyze a file on the Analyze page.</div>`}</div>`);
+  wireRows();
+  const create = async () => {
+    const name = $("nc-name").value.trim(); if (!name) return $("nc-name").focus();
+    const r = await api("/api/lab/case", { name });
+    if (r.error) return toast(r.error, true);
+    toast(`Created “${name}”`);
+    if (r.id) location.hash = `#/case/${r.id}`; else viewCases();
+  };
+  $("nc-create").onclick = create;
+  $("nc-name").onkeydown = (e) => { if (e.key === "Enter") create(); };
+}
+
+async function viewCase(cid) {
+  setNav("cases"); cur = { view: "case", cid }; loading();
+  const d = await api("/api/lab/case/" + cid);
+  if (cur.view !== "case" || cur.cid !== cid) return;
+  if (d.error || !d.case) return page(`<div class="empty"><b>Case not found</b><a class="btn" href="#/cases">Back to cases</a></div>`);
+  const c = d.case, samples = d.samples.slice().sort((a, b) => (b.risk || 0) - (a.risk || 0));
+  page(`
+  <nav class="crumbs"><a href="#/cases">Cases</a><span>/</span><b>${esc(c.name)}</b></nav>
+  <div class="page-head"><div><h1>${esc(c.name)}</h1><p class="sub">${plural(samples.length, "sample")} · created ${fmtDate(c.created)}</p></div>
+    <div class="row"><button id="c-iocs" ${samples.length ? "" : "disabled"}>Copy IOCs</button>
+      <select id="c-export" aria-label="Export IOCs" ${samples.length ? "" : "disabled"}><option value="">Export IOCs…</option><option value="csv">CSV</option><option value="stix">STIX 2.1 (MISP / OpenCTI)</option><option value="txt">Defanged text</option></select>
+      <button id="c-compare" ${samples.length > 1 ? "" : "disabled"}>Compare</button>
+      <button id="c-report" ${samples.length ? "" : "disabled"}>Download report</button><button class="ghost red" id="c-del">Delete</button></div></div>
+  <div class="row" style="margin-bottom:16px;gap:8px"><button class="sm" id="c-attck" ${samples.length ? "" : "disabled"}>ATT&amp;CK matrix</button>
+    <button class="sm" id="c-timeline" ${samples.length ? "" : "disabled"}>Timeline</button>
+    <button class="sm" id="c-enrich" ${samples.length ? "" : "disabled"} title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button></div>
+  <div id="c-compare-box"></div>
+  <div class="split">
+    <div class="stack">
+      <div class="card flush">${samples.length ? `<table><thead><tr><th>Risk</th><th>File</th><th class="hide-sm">Type</th><th class="hide-sm">Runs</th><th></th></tr></thead><tbody>
+        ${samples.map((s) => `<tr class="link" data-href="#/case/${cid}/sample/${s.id}"><td>${riskBadge(s.risk)}</td>
+          <td><div class="mono" style="font-size:13px;color:var(--text)">${esc(s.filename)}</div><div class="small">${esc(s.source || "")}</div></td>
+          <td class="small hide-sm">${esc(s.file_type || "")}</td><td class="hide-sm">${s.run_count || 0}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
+        : `<div class="empty"><b>No samples yet</b>Use “Add samples” to upload a file or archive.</div>`}</div>
+      <div class="card"><h3>Notes</h3><textarea id="c-notes" style="width:100%;min-height:110px" placeholder="Findings, hypotheses, next steps…" aria-label="Case notes">${esc(c.notes || "")}</textarea>
+        <div class="row end" style="margin-top:10px"><span class="small" id="c-notes-st"></span><button id="c-notes-save">Save notes</button></div></div>
+      <div class="card"><h3>Threat groups</h3><div id="c-groups"><span class="spin"></span></div></div>
+    </div>
+    <aside class="card">
+      <h3>Add samples</h3>
+      <div class="drop sm" id="c-drop" tabindex="0" role="button" aria-label="Upload files"><div class="t">Drop files or click to upload</div><div class="small">Zip and 7z archives are unpacked</div><input type="file" id="c-file" hidden multiple></div>
+      <div style="display:grid;gap:8px;margin-top:14px">
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;cursor:pointer">${sw("c-unpack", OPTS.unpack)} Unpack archives</label>
+        <input id="c-pw" class="mono-in" placeholder="Archive password (default: infected)" style="height:32px" autocomplete="off" spellcheck="false" aria-label="Archive password"></div>
+      <details style="margin-top:16px"><summary style="cursor:pointer;font-weight:500">From a repository or link</summary>
+        <div style="display:grid;gap:8px;margin-top:12px">
+          <div class="row"><input id="c-hash" class="grow mono-in" placeholder="SHA-256" aria-label="SHA-256"><button id="c-hash-go">Fetch</button></div>
+          <div class="row"><input id="c-url" class="grow" placeholder="Download URL" aria-label="Download URL"><button id="c-url-go">Fetch</button></div>
+          <div class="row"><input id="c-q" class="grow" placeholder="Search virus.exchange" aria-label="Search"><button id="c-q-go">Search</button></div>
+          <div id="c-results"></div>
+          <p class="small">Fetching by hash and searching need a virus.exchange key in <a href="#/settings">Settings</a>.</p>
+        </div></details>
+      <p class="small" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><b style="color:var(--text2)">From vx-underground:</b> download from <a href="https://vx-underground.org/Samples" target="_blank" rel="noopener">Samples</a> or <a href="https://vx-underground.org/Archive/Collections" target="_blank" rel="noopener">Collections</a> in your browser, then drop the .7z here. It opens with the password <span class="mono">infected</span>.</p>
+    </aside>
+  </div>`);
+  wireRows();
+  const opts = () => ({ unpack: $("c-unpack").checked, password: $("c-pw").value.trim() });
+  $("c-unpack").onchange = () => { OPTS.unpack = $("c-unpack").checked; saveOpts(); };
+  const added = (r, name) => r.archive ? toast(`Unpacked ${r.archive.name}: ${plural(r.archive.count, "file")} added`) : toast(`${name} added`);
+  setupDrop($("c-drop"), $("c-file"), async (files) => {
+    $("c-drop").querySelector(".t").innerHTML = `<span class="spin"></span> Uploading…`;
+    for (const f of files) {
+      const o = opts();
+      const r = await fetch(`/api/lab/case/${cid}/upload`, { method: "POST", body: await f.arrayBuffer(),
+        headers: { "X-Filename": f.name, "X-Unpack": o.unpack ? "1" : "0", "X-Archive-Password": encodeURIComponent(o.password) } })
+        .then((x) => x.json()).catch((e) => ({ error: String(e) }));
+      if (r.error) toast(r.error, true); else added(r, f.name);
+    }
+    viewCase(cid);
+  });
+  const fetchInto = async (btn, body, label) => {
+    btn.disabled = true; const t = btn.textContent; btn.innerHTML = `<span class="spin"></span>`;
+    const r = await api(`/api/lab/case/${cid}/acquire`, { ...body, ...opts() });
+    btn.disabled = false; btn.textContent = t;
+    if (r.error) return toast(r.error, true);
+    added(r, label); viewCase(cid);
+  };
+  $("c-hash-go").onclick = () => { const h = $("c-hash").value.trim(); if (h) fetchInto($("c-hash-go"), { hash: h }, h.slice(0, 12) + "…"); };
+  $("c-url-go").onclick = () => { const u = $("c-url").value.trim(); if (u) fetchInto($("c-url-go"), { url: u }, "Download"); };
+  $("c-q-go").onclick = async () => {
+    const q = $("c-q").value.trim(); if (!q) return;
+    const box = $("c-results"); box.innerHTML = `<div class="small"><span class="spin"></span> Searching…</div>`;
+    const r = await api("/api/lab/search", { query: q });
+    if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
+    box.innerHTML = r.results.length ? `<div class="tbl"><table><tbody>${r.results.map((x) => `<tr><td><div style="font-size:13px">${esc(x.name || "")}</div><div class="mono small">${esc((x.sha256 || "").slice(0, 24))}…</div></td><td style="text-align:right"><button class="sm" data-fetch="${esc(x.sha256)}">Fetch</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="none">No results.</div>`;
+    box.querySelectorAll("[data-fetch]").forEach((b) => b.onclick = () => fetchInto(b, { hash: b.dataset.fetch }, b.dataset.fetch.slice(0, 12) + "…"));
+  };
+  for (const [i, b] of [["c-hash", "c-hash-go"], ["c-url", "c-url-go"], ["c-q", "c-q-go"]]) $(i).onkeydown = (e) => { if (e.key === "Enter") $(b).click(); };
+  $("c-notes-save").onclick = async () => {
+    const r = await api(`/api/lab/case/${cid}/update`, { notes: $("c-notes").value });
+    if (r.error) return toast(r.error, true);
+    $("c-notes-st").textContent = "Saved"; setTimeout(() => { if ($("c-notes-st")) $("c-notes-st").textContent = ""; }, 1500);
+  };
+  $("c-del").onclick = async () => {
+    if (!await ask({ title: `Delete “${c.name}”?`, body: `<p>This removes the case and its ${plural(samples.length, "sample")}, runs and notes. It can't be undone.</p>`, ok: "Delete case", danger: true })) return;
+    await api(`/api/lab/case/${cid}/delete`, {}); toast("Case deleted"); location.hash = "#/cases";
+  };
+  $("c-report").onclick = async () => {
+    const r = await fetch(`/api/lab/case/${cid}/report`); if (!r.ok) return toast("Couldn't build the report", true);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob());
+    a.download = (c.name || "case").replace(/[^A-Za-z0-9._-]+/g, "_") + "-report.md"; a.click(); URL.revokeObjectURL(a.href);
+  };
+  $("c-iocs").onclick = async () => {
+    const r = await api(`/api/lab/case/${cid}/iocs`); if (r.error) return toast(r.error, true);
+    const lines = [];
+    for (const [l, k] of [["URLs", "urls"], ["IPs", "ips"], ["Domains", "domains"]]) if (r[k].length) lines.push(`# ${l}`, ...r[k], "");
+    lines.push("# File hashes (SHA-256)", ...r.hashes.map((h) => `${h.sha256}  ${h.filename}`));
+    try { await navigator.clipboard.writeText(lines.join("\n")); toast("IOCs copied to clipboard"); } catch { toast("Clipboard not available", true); }
+  };
+  $("c-compare").onclick = async () => {
+    const box = $("c-compare-box"); box.innerHTML = `<div class="card" style="margin-bottom:20px"><span class="spin"></span></div>`;
+    const r = await api(`/api/lab/case/${cid}/compare`);
+    if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
+    const ov = Object.entries(r.ioc_overlap || {});
+    box.innerHTML = `<div class="card" style="margin-bottom:20px"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">What the ${r.count} samples share</h3><button class="ghost sm" id="cmp-x">Close</button></div>
+      <div class="two"><div><div class="sublabel">Indicators in every sample</div>${list(r.shared_iocs_all)}</div><div><div class="sublabel">Detections in every sample</div>${list(r.shared_detections_all)}</div></div>
+      <div class="sublabel" style="margin-top:14px">Suspicious imports in every sample</div>${list(r.shared_imports_all)}
+      <div class="sublabel" style="margin-top:14px">Indicators shared by 2+ samples</div>${ov.length ? `<div class="tbl"><table><tbody>${ov.map(([k, v]) => `<tr><td class="mono break">${esc(k)}</td><td class="small">${esc(v.join(", "))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="none">None</div>`}</div>`;
+    $("cmp-x").onclick = () => box.innerHTML = "";
+  };
+  $("c-export").onchange = () => { const f = $("c-export").value; $("c-export").value = ""; if (f) download(`/api/lab/case/${cid}/iocs/export?format=${f}`, `iocs.${f}`); };
+  const panel = (title, inner) => {
+    $("c-compare-box").innerHTML = `<div class="card" style="margin-bottom:20px"><div class="row" style="margin-bottom:10px"><h3 class="grow" style="margin:0">${title}</h3><button class="ghost sm" id="pn-x">Close</button></div>${inner}</div>`;
+    $("pn-x").onclick = () => $("c-compare-box").innerHTML = "";
+  };
+  $("c-attck").onclick = async () => {
+    panel("ATT&amp;CK techniques across the case", `<span class="spin"></span>`);
+    const r = await api(`/api/lab/case/${cid}/attck`); if (r.error) return toast(r.error, true);
+    panel("ATT&amp;CK techniques across the case", matrixHtml(r.matrix) + `<p class="small" style="margin-top:10px">Hover a technique to see which detections fired it.</p>`);
+  };
+  $("c-timeline").onclick = async () => {
+    panel("Timeline", `<span class="spin"></span>`);
+    const r = await api(`/api/lab/case/${cid}/timeline`); if (r.error) return toast(r.error, true);
+    panel(`Timeline <span class="badge">${r.events.length}</span>`, r.events.length ? `<div class="tl">${r.events.map((e) =>
+      `<div><span class="small">${e.t ? new Date(e.t * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "medium" }) : ""}</span><span class="kind">${esc(e.kind)}</span><span class="break"><span class="small mono">${esc(e.sample)}</span> ${esc(e.text)}</span></div>`).join("")}</div>`
+      : `<div class="none">Nothing yet.</div>`) ;
+  };
+  const showEnrich = (r) => {
+    const rows = r.indicators || [];
+    panel(`IOC enrichment <span class="badge">${rows.length}</span>`, `
+      <p class="small">Free sources: OTX, Feodo Tracker, GreyNoise, Shodan InternetDB, RDAP${r.abusech_configured ? ", ThreatFox, URLhaus" : ` (add an abuse.ch key in <a href="#/settings">Settings</a> for ThreatFox and URLhaus)`}. Checked ${fmtDate(r.checked)}${r.skipped ? ` · ${r.skipped} more not checked (limit 40)` : ""}. <button class="sm" id="en-refresh">Refresh</button></p>
+      ${(r.actors || []).length ? `<div class="sublabel">Groups named by the sources</div><div class="chips">${r.actors.map((a) => `<span class="chip attck">${esc(a)}</span>`).join("")}</div>` : ""}
+      ${(r.families || []).length ? `<div class="sublabel">Malware families</div><div class="chips">${r.families.map((a) => `<span class="chip">${esc(a)}</span>`).join("")}</div>` : ""}
+      ${rows.length ? `<div class="tbl" style="margin-top:12px"><table><thead><tr><th>Indicator</th><th>Verdict</th><th>What the sources say</th></tr></thead><tbody>${rows.map((x) => `<tr>
+        <td class="mono break">${esc(x.value)}<div class="small">${esc(x.type)}</div></td><td>${verdictBadge(x.summary.verdict)}</td>
+        <td>${x.results.filter((p) => p.found || p.error).map((p) => `<div class="small"><b>${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.provider)}</a>` : esc(p.provider)}</b>: ${p.error ? `<span style="color:var(--red)">${esc(p.error)}</span>`
+          : esc([p.verdict !== "unknown" ? p.verdict : "", p.families.join(", "), p.actors.length ? "actor: " + p.actors.join(", ") : "",
+                 p.tags.slice(0, 5).join(", "), ...detailBits(p.details)].filter(Boolean).join(" · "))}</div>`).join("") || `<span class="small">Not seen anywhere</span>`}</td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="none">No public IPs, domains or URLs in this case.</div>`}`);
+    $("en-refresh").onclick = () => runEnrich(true);
+  };
+  const runEnrich = async (refresh) => {
+    if (refresh || !$("c-compare-box").dataset.enriched) {
+      if (!await ask({ title: "Look up this case's indicators online?", ok: "Look up",
+        body: `<p>The case's public IPs, domains and URLs are sent to free intel services (OTX, GreyNoise, Shodan InternetDB, RDAP, abuse.ch). Samples are never uploaded.</p><p>Looking up an indicator tells those services you're interested in it, which a careful adversary might notice.</p>` })) return;
+    }
+    panel("IOC enrichment", `<div class="row"><span class="spin"></span> Querying sources…</div>`);
+    const r = await api(`/api/lab/case/${cid}/enrich`, { refresh: !!refresh });
+    if (r.error) return panel("IOC enrichment", `<div class="none" style="color:var(--red)">${esc(r.error)}</div>`);
+    $("c-compare-box").dataset.enriched = "1"; showEnrich(r);
+  };
+  $("c-enrich").onclick = () => runEnrich(false);
+  loadCaseGroups(cid, samples);
+}
+async function loadCaseGroups(cid, samples) {
+  const [r, lk] = await Promise.all([api("/api/lab/actors"), api(`/api/lab/case/${cid}/groups`)]);
+  if (!$("c-groups")) return;
+  const all = r.actors || [], linked = lk.links || [];
+  $("c-groups").innerHTML = `${linked.length ? `<div class="chips" style="margin-bottom:10px">${linked.map((l) => `<a class="chip attck" href="#/actor/${l.actor_id}">${esc(l.actor_name)} · ${esc(l.confidence)} confidence</a>`).join("")}</div>` : `<p class="small">No group linked to this case.</p>`}
+    ${all.length ? `<div class="row"><select id="cg-sel" class="grow" aria-label="Threat group">${all.map((a) => `<option value="${a.id}">${esc(a.name)}${a.mitre_id ? ` (${esc(a.mitre_id)})` : ""}</option>`).join("")}</select>
+      <select id="cg-conf" aria-label="Confidence"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button class="sm" id="cg-link">Link</button></div>
+      <p class="small" style="margin-top:8px">Open a sample's <b>Investigate</b> tab for suggested groups.</p>`
+      : `<p class="small">No groups tracked yet. <a href="#/actors">Import MITRE ATT&amp;CK / MISP groups or add your own.</a></p>`}`;
+  if ($("cg-link")) $("cg-link").onclick = async () => {
+    const r2 = await api(`/api/lab/actors/${$("cg-sel").value}/link`, { kind: "case", target_id: cid, confidence: $("cg-conf").value });
+    if (r2.error) return toast(r2.error, true);
+    toast("Group linked"); loadCaseGroups(cid, samples);
+  };
+}
+
+// ============================================================ Sample page
+const TABS = [["overview", "Overview"], ["static", "Static"], ["behavior", "Behavior"], ["intel", "Threat intel"], ["investigate", "Investigate"]];
+async function viewSample(cid, sid, tab, force) {
+  setNav("cases");
+  const same = SAMPLE && SAMPLE.s.id === sid && !force;
+  cur = { view: "sample", cid, sid, tab };
+  if (!same) {
+    if (!force) loading();
+    const [d, st, det] = await Promise.all([api("/api/lab/case/" + cid), api(`/api/lab/sample/${sid}/static`), api(`/api/lab/sample/${sid}/detections`)]);
+    if (cur.view !== "sample" || cur.sid !== sid) return;
+    const s = d.samples && d.samples.find((x) => x.id === sid);
+    if (!s) return page(`<div class="empty"><b>Sample not found</b><a class="btn" href="#/case/${cid}">Back to case</a></div>`);
+    SAMPLE = { c: d.case, s, st: st && !st.error ? st : null, det: det && !det.error ? det : {}, run: force && SAMPLE ? SAMPLE.run : null };
+  }
+  renderSample(same || force);
+}
+function renderSample(keepScroll) {
+  const { c, s, st } = SAMPLE, { cid, sid, tab } = cur;
+  const runs = s.runs || [], base = `#/case/${cid}/sample/${sid}`;
+  const iocs = st && st.iocs ? (st.iocs.urls || []).length + (st.iocs.ips || []).length + (st.iocs.domains || []).length : 0;
+  const counts = { static: iocs, behavior: runs.length, intel: INTEL[sid] && INTEL[sid] !== "pending" ? INTEL[sid].summary.hits : 0 };
+  page(`
+  <nav class="crumbs"><a href="#/cases">Cases</a><span>/</span><a href="#/case/${cid}">${esc(c.name)}</a><span>/</span><b class="mono">${esc(s.filename)}</b></nav>
+  <div class="shead">${gauge(s.risk, 76)}
+    <div class="info"><div class="row" style="gap:8px"><span class="badge ${riskClass(s.risk)}">${riskWord(s.risk)}</span><span class="small">${esc(s.file_type || "")} · ${fmtSize(s.size)}</span></div>
+      <h1>${esc(s.filename)}</h1><div class="small">${esc(s.source || "")} · added ${fmtDate(s.added)}</div></div>
+    <div class="row"><button id="s-opensb" ${LAB && LAB.sandbox.available && !LAB.sandbox.busy ? "" : "disabled"} title="Open a hardened sandbox with this sample read-only on its desktop">Open in sandbox</button><a class="btn" href="${base}/intel">Threat intel</a>
+      ${DETONATING[sid] ? `<a class="btn" href="${base}/behavior"><span class="spin"></span> Detonating</a>` : `<a class="btn ${LAB && LAB.sandbox.available ? "primary" : ""}" href="${base}/behavior">Detonate</a>`}</div></div>
+  <nav class="tabs">${TABS.map(([k, l]) => `<a href="${base}${k === "overview" ? "" : "/" + k}" class="${k === tab ? "on" : ""}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}</a>`).join("")}</nav>
+  <div id="tab"></div>`, keepScroll);
+  $("s-opensb").onclick = () => openSandbox(s.id, s.filename);
+  ({ overview: tabOverview, static: tabStatic, behavior: tabBehavior, intel: tabIntel, investigate: tabInvestigate }[tab] || tabOverview)();
+}
+
+// investigate: related samples, threat-group leads, YARA draft
+async function tabInvestigate() {
+  const { s } = SAMPLE, sid = s.id;
+  $("tab").innerHTML = `<div class="stack">
+    <div class="card"><h3>Possible threat groups</h3><div id="iv-actors"><span class="spin"></span></div></div>
+    <div class="card"><h3>Related samples in the lab</h3><div id="iv-related"><span class="spin"></span></div></div>
+    <div class="card"><div class="row"><h3 class="grow" style="margin:0">Hunting rule draft</h3><button class="sm" id="iv-yara">Generate YARA rule</button></div><div id="iv-yara-box"></div></div></div>`;
+  $("iv-yara").onclick = async () => {
+    const r = await api(`/api/lab/sample/${sid}/yara`); if (r.error) return toast(r.error, true);
+    $("iv-yara-box").innerHTML = `<p class="small" style="margin-top:10px">Built from distinctive strings, embedded IOCs and the imphash. Tune it before relying on it.</p>
+      <textarea id="iv-yara-text" spellcheck="false" style="width:100%;min-height:260px;font-family:var(--mono);font-size:12.5px">${esc(r.text)}</textarea>
+      <div class="row end" style="margin-top:8px"><input id="iv-yara-name" class="mono-in" value="${esc(r.name)}" style="width:280px" aria-label="Rule file name"><button class="primary sm" id="iv-yara-save">Save to rules</button></div>`;
+    $("iv-yara-save").onclick = async () => {
+      const r2 = await api("/api/lab/yara/save", { name: $("iv-yara-name").value.trim(), text: $("iv-yara-text").value });
+      if (r2.error) return toast(r2.error, true);
+      toast(`${r2.name} saved; new samples are scanned with it`); refreshState();
+    };
+  };
+  const [rel, act] = await Promise.all([api(`/api/lab/sample/${sid}/related`), api(`/api/lab/sample/${sid}/actors`)]);
+  if (cur.sid !== sid || cur.tab !== "investigate") return;
+  $("iv-related").innerHTML = rel.error ? `<div class="none">${esc(rel.error)}</div>` : (rel.related || []).length
+    ? `<div class="tbl"><table><tbody>${rel.related.map((x) => `<tr class="link" data-href="#/case/${x.case_id}/sample/${x.id}"><td>${riskBadge(x.risk)}</td><td><div class="mono" style="font-size:13px">${esc(x.filename)}</div><div class="small">${esc(x.case_name)}</div></td><td class="small">${esc(x.why.join(" · "))}</td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="none">Nothing similar yet. Matching uses imphash, string overlap, TLSH when installed, and shared IOCs.</div>`;
+  wireRows();
+  const linked = act.linked || [];
+  const leads = act.suggestions || [];
+  $("iv-actors").innerHTML = act.error ? `<div class="none">${esc(act.error)}</div>` : `
+    ${linked.length ? `<div class="sublabel">Linked</div><div class="chips">${linked.map((l) => `<a class="chip attck" href="#/actor/${l.actor_id}">${esc(l.actor_name)} · ${esc(l.confidence)} (${esc(l.kind)})</a>`).join("")}</div>` : ""}
+    ${!act.catalog_size ? `<p class="small">No groups tracked yet. <a href="#/actors">Import MITRE ATT&amp;CK / MISP groups</a> to get suggestions.</p>`
+      : leads.length ? leads.map((l) => `<div class="lead"><div class="row"><a class="grow" href="#/actor/${l.id}"><b>${esc(l.name)}</b>${l.mitre_id ? ` <span class="small mono">${esc(l.mitre_id)}</span>` : ""}</a>
+          <span class="badge ${l.strength === "strong" ? "hi" : l.strength === "moderate" ? "mid" : ""}">${esc(cap(l.strength))} lead</span>
+          <select data-conf="${l.id}" aria-label="Confidence"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button class="sm" data-link="${l.id}">Link sample</button></div>
+          <div class="small">${l.why.map(esc).join("<br>")}</div></div>`).join("")
+      : `<p class="small">No group matches yet. Leads come from intel family labels (run <b>Threat intel</b> and the case's <b>Enrich IOCs</b>), sample labels, YARA rule names, ATT&amp;CK overlap and IOCs shared with groups' other samples.</p>`}
+    <p class="small" style="margin-top:10px">Suggestions are leads, not attribution: confirm them against reporting before linking at medium or high confidence.</p>`;
+  $("iv-actors").querySelectorAll("[data-link]").forEach((b) => b.onclick = async () => {
+    const conf = $("iv-actors").querySelector(`[data-conf="${b.dataset.link}"]`).value;
+    const r = await api(`/api/lab/actors/${b.dataset.link}/link`, { kind: "sample", target_id: sid, confidence: conf });
+    if (r.error) return toast(r.error, true);
+    toast("Sample linked to group"); tabInvestigate();
+  });
+}
+function tabOverview() {
+  const { s, st, det } = SAMPLE, sid = s.id;
+  const dets = det.detections || [];
+  const un = UNPACK && UNPACK.sid === sid ? UNPACK : null;
+  $("tab").innerHTML = `<div class="stack">
+    ${un ? `<div class="notice" style="margin:0"><span class="nic" style="background:var(--accent)">i</span><div class="grow">Unpacked from <b>${esc(un.archive.name)}</b>${un.archive.password ? ` (password <span class="mono">${esc(un.archive.password)}</span>)` : ""}. This is the riskiest of its ${plural(un.archive.count, "file")}${un.siblings.length ? ". The others:" : "."}
+      ${un.siblings.length ? `<div class="chips" style="margin-top:8px">${un.siblings.map((x) => `<a class="chip" href="#/case/${cur.cid}/sample/${x.id}">${esc(x.filename)} · risk ${x.risk ?? 0}</a>`).join("")}</div>` : ""}</div></div>` : ""}
+    <div class="two">
+      <div class="card"><h3>Why this score</h3>${st && st.risk_reasons && st.risk_reasons.length ? `<div class="reasons">${st.risk_reasons.map((r) => `<div>${esc(r)}</div>`).join("")}</div>` : `<div class="none">No risk factors found.</div>`}</div>
+      <div class="card"><h3>File</h3><div class="kv">
+        <div class="k">SHA-256</div><div class="copyable"><span class="mono">${esc(s.sha256)}</span>${copyBtn(s.sha256)}</div>
+        ${s.sha1 ? `<div class="k">SHA-1</div><div class="copyable"><span class="mono">${esc(s.sha1)}</span>${copyBtn(s.sha1)}</div>` : ""}
+        ${s.md5 ? `<div class="k">MD5</div><div class="copyable"><span class="mono">${esc(s.md5)}</span>${copyBtn(s.md5)}</div>` : ""}
+        <div class="k">Size</div><div>${fmtSize(s.size)}${st ? ` · entropy ${st.entropy}` : ""}</div></div></div>
+    </div>
+    <div class="card flush"><div style="padding:16px 18px 12px" class="row"><h3 class="grow" style="margin:0">Detections</h3>${(det.attck || []).length ? `<span class="small">ATT&amp;CK ${esc(det.attck.join(", "))}</span>` : ""}</div>
+      ${dets.length ? dets.map(detHtml).join("") : `<div class="none" style="padding:0 18px 18px">No detections yet. Detonating the sample adds behavioral detections.</div>`}</div>
+    <div class="card"><h3>Analyst notes</h3>
+      <div class="field"><label for="s-labels">Labels <span class="small">comma-separated: family names, "false positive", campaign…</span></label><input id="s-labels" value="${esc(s.labels || "")}" placeholder="e.g. AgentTesla, phishing-wave-3"></div>
+      <div class="field"><label for="s-notes">Notes</label><textarea id="s-notes" style="width:100%;min-height:100px" placeholder="What you found, what to check next…">${esc(s.notes || "")}</textarea></div>
+      <div class="row end" style="margin-top:10px"><span class="small" id="s-notes-st"></span><button id="s-notes-save">Save</button></div></div>
+  </div>`;
+  $("s-notes-save").onclick = async () => {
+    const r = await api(`/api/lab/sample/${sid}/annotate`, { notes: $("s-notes").value, labels: $("s-labels").value });
+    if (r.error) return toast(r.error, true);
+    Object.assign(SAMPLE.s, { notes: r.notes, labels: r.labels });
+    $("s-notes-st").textContent = "Saved"; setTimeout(() => { if ($("s-notes-st")) $("s-notes-st").textContent = ""; }, 1500);
+  };
+}
+const detHtml = (d) => `<div class="det"><div class="row"><b class="grow">${esc(d.name)}</b><span class="badge ${esc(d.severity)}">${esc(cap(d.severity))}</span></div>
+  <p>${esc(d.description)}</p>
+  ${(d.attck || []).length ? `<div class="chips" style="margin-top:8px">${d.attck.map((a) => `<a class="chip attck" target="_blank" rel="noopener" href="https://attack.mitre.org/techniques/${esc(a.replace(".", "/"))}/">${esc(a)}</a>`).join("")}</div>` : ""}
+  ${d.evidence && d.evidence.length ? `<pre style="margin-top:8px;max-height:130px">${esc(d.evidence.join("\n"))}</pre>` : ""}</div>`;
+
+function tabStatic() {
+  const st = SAMPLE.st;
+  if (!st) { $("tab").innerHTML = `<div class="card"><div class="none">No static report for this sample.</div></div>`; return; }
+  const io = st.iocs || {}, n = (io.urls || []).length + (io.ips || []).length + (io.domains || []).length;
+  let h = sect(`Indicators <span class="badge">${n}</span>`, n > 0, `<div class="sublabel">URLs</div>${list(io.urls)}<div class="sublabel">IP addresses</div>${list(io.ips)}<div class="sublabel">Domains</div>${list(io.domains)}<div class="sublabel">Registry</div>${list(io.registry)}`);
+  if (st.pe) {
+    const pe = st.pe;
+    let p = pe.error ? `<div class="none">${esc(pe.error)}</div>` : `<div class="kv"><div class="k">Compiled</div><div>${esc(pe.compiled || "?")}</div><div class="k">Kind</div><div>${pe.dll ? "DLL" : "EXE"}${pe.dotnet ? " · .NET" : ""} · subsystem ${esc(String(pe.subsystem))}</div><div class="k">Packed</div><div>${pe.packed_hint ? "Likely" : "No sign of packing"}</div>
+      ${pe.imphash ? `<div class="k">imphash</div><div class="copyable"><span class="mono">${esc(pe.imphash)}</span>${copyBtn(pe.imphash)}</div>` : ""}
+      ${st.hashes && st.hashes.tlsh ? `<div class="k">TLSH</div><div class="copyable"><span class="mono break">${esc(st.hashes.tlsh)}</span>${copyBtn(st.hashes.tlsh)}</div>` : ""}
+      <div class="k">Signature</div><div>${pe.signed ? "Has an Authenticode signature (not verified here)" : "Unsigned"}</div>
+      ${pe.tls_callbacks ? `<div class="k">TLS callbacks</div><div>${pe.tls_callbacks}</div>` : ""}
+      ${pe.overlay ? `<div class="k">Overlay</div><div>${fmtSize(pe.overlay.size)} at offset 0x${pe.overlay.offset.toString(16)}</div>` : ""}</div>`;
+    if ((pe.exports || []).length) p += `<div class="sublabel">Exports <span class="badge">${pe.exports.length}</span></div>${list(pe.exports)}`;
+    if ((pe.resources || []).length) p += `<div class="sublabel">Resources</div><div class="tbl"><table><thead><tr><th>Type</th><th>Size</th><th>Entropy</th><th></th></tr></thead><tbody>${pe.resources.map((x) => `<tr><td class="mono">${esc(x.type)}</td><td>${fmtSize(x.size)}</td><td>${x.entropy ?? ""}</td><td>${x.embedded_pe ? `<span class="badge hi">embedded PE</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    if ((pe.suspicious_imports || []).length) p += `<div class="sublabel">Suspicious imports</div><div class="chips">${pe.suspicious_imports.map((i) => `<span class="chip">${esc(i)}</span>`).join("")}</div>`;
+    if (pe.sections) p += `<div class="sublabel">Sections</div><div class="tbl"><table><thead><tr><th>Name</th><th>Raw size</th><th>Entropy</th></tr></thead><tbody>${pe.sections.map((x) => `<tr><td class="mono">${esc(x.name)}</td><td>${x.rawsize}</td><td style="${x.suspicious ? "color:var(--red);font-weight:600" : ""}">${x.entropy}</td></tr>`).join("")}</tbody></table></div>`;
+    if (pe.note) p += `<div class="small">${esc(pe.note)}</div>`;
+    h += sect("PE structure", false, p);
+  }
+  if (st.office_macros) {
+    const m = st.office_macros;
+    h += sect(`Office macros ${m.has_macros ? `<span class="badge mid">present</span>` : ""}`, m.has_macros, m.has_macros
+      ? `<div class="kv"><div class="k">Auto-exec</div><div>${m.autoexec && m.autoexec.length ? esc(m.autoexec.join(", ")) : "None"}</div></div><pre>${esc(JSON.stringify(m.streams || [], null, 2))}</pre>` : `<div class="none">No macros</div>`);
+  }
+  if (st.archive) h += sect("Archive contents", false, `<div class="small">${st.archive.encrypted ? "Encrypted · " : ""}${plural(st.archive.entries, "entry")}${(st.archive.risky_members || []).length ? " · contains executables" : ""}</div>${list(st.archive.names)}`);
+  if (st.capa) h += sect(`Capabilities (capa) ${st.capa.count ? `<span class="badge">${st.capa.count}</span>` : ""}`, false, st.capa.error ? `<div class="none">${esc(st.capa.error)}</div>`
+    : `<div class="tbl"><table><tbody>${(st.capa.capabilities || []).map((c) => `<tr><td>${esc(c.name)}</td><td class="small mono">${esc(c.namespace)}</td><td class="small">${esc(c.attck.join(", "))}</td></tr>`).join("")}</tbody></table></div>`);
+  if (st.yara && st.yara.matches) h += sect(`YARA <span class="badge">${st.yara.matches.length}</span>`, st.yara.matches.length > 0, list(st.yara.matches.map((m) => `${m.rule} ${m.tags.join(",")}`), "No matches"));
+  h += sect(`Strings <span class="badge">${st.string_count}</span>`, false, list(st.strings_sample));
+  $("tab").innerHTML = `<div class="card flush">${h}</div>`;
+}
+
+function tabBehavior() {
+  const { s } = SAMPLE, sid = s.id, runs = s.runs || [], sb = (LAB && LAB.sandbox) || {};
+  const withReport = runs.filter((r) => r.report);
+  $("tab").innerHTML = `<div class="stack">
+    <div class="card"><div class="row" style="align-items:flex-end;gap:18px">
+      <div class="field"><label for="d-timeout">Run time</label><select id="d-timeout">${timeOpts(OPTS.timeout)}</select></div>
+      <div class="field"><label>Network</label>${seg("d-net", NET_OPTS, OPTS.net)}</div>
+      <div class="grow small" style="min-width:200px">${sb.available ? "Runs in a fresh Windows Sandbox that's wiped afterward." : "Windows Sandbox is off on this PC, so detonation isn't available."}</div>
+      <button class="danger" id="d-go" ${sb.available && !DETONATING[sid] ? "" : "disabled"}>${DETONATING[sid] ? `<span class="spin"></span> Detonating…` : "Detonate"}</button></div></div>
+    <div class="card flush"><div class="row" style="padding:16px 18px 12px"><h3 class="grow" style="margin:0">Runs</h3>${withReport.length >= 2 ? `<button class="sm" id="d-diff">Compare last two</button>` : ""}</div>
+      ${runs.length ? `<table><thead><tr><th>Started</th><th>Status</th><th>Verdict</th><th></th></tr></thead><tbody>${runs.map((r) => `<tr class="${r.report ? "link" : ""}" data-run="${r.report ? r.id : ""}"><td class="small">${fmtDate(r.started)}</td><td><span class="badge">${esc(cap(r.status))}</span></td><td>${esc(r.verdict || "")}</td><td class="chev">${r.report ? "›" : ""}</td></tr>`).join("")}</tbody></table>`
+        : `<div class="none" style="padding:0 18px 18px">No runs yet.</div>`}</div>
+    <div id="d-diffbox"></div><div id="d-run"></div></div>`;
+  let net = OPTS.net;
+  wireSeg("d-net", (v) => net = v);
+  $("d-go").onclick = () => detonate(sid, +$("d-timeout").value, net);
+  $("tab").querySelectorAll("tr[data-run]").forEach((tr) => { if (tr.dataset.run) tr.onclick = () => showRun(sid, tr.dataset.run); });
+  if ($("d-diff")) $("d-diff").onclick = () => diffRuns(sid, withReport);
+  if (withReport.length) showRun(sid, withReport.some((r) => r.id === SAMPLE.run) ? SAMPLE.run : withReport[0].id);
+}
+async function showRun(sid, rid) {
+  SAMPLE.run = rid;
+  const box = $("d-run"); box.innerHTML = `<div class="card"><span class="spin"></span></div>`;
+  const d = await api(`/api/lab/sample/${sid}/dynamic/${rid}`);
+  if (!$("d-run") || cur.sid !== sid) return;
+  if (d.error) { box.innerHTML = ""; return toast(d.error, true); }
+  const det = SAMPLE.det || {};
+  const shot = d.screenshot ? `/api/lab/sample/${sid}/screenshot/${rid}` : null, pcap = d.pcap ? `/api/lab/sample/${sid}/pcap/${rid}` : null;
+  const persist = [...(d.new_runkeys || []), ...(d.new_tasks || []).map((t) => "task: " + t), ...(d.new_services || []).map((x) => "service: " + x)];
+  $("d-run").innerHTML = `<div class="card flush">
+    <div style="padding:18px"><div class="kv"><div class="k">Verdict</div><div><b>${esc(d.verdict || "")}</b></div>
+      <div class="k">Executed</div><div>${d.detonated ? "Yes" : "No"}${d.launch_error ? " · " + esc(d.launch_error) : ""}</div>
+      <div class="k">Network</div><div>${{ off: "Off", simulated: "Simulated (FakeNet-NG inside the VM; nothing real leaves)", internet: "Internet only (LAN and host blocked by an in-VM firewall rule)", full: "Full, including your LAN" }[d.network_mode] || (d.safe_net ? "Internet only (LAN and host blocked by an in-VM firewall rule)" : "Not recorded")}${d.host_guard === true ? " · host network guard on" : d.host_guard === false ? ` · <span style="color:var(--amber)">host network guard was off</span>` : ""}</div>
+      ${d.fakenet && d.fakenet.died_at != null ? `<div class="k">Integrity</div><div style="color:var(--red)"><b>FakeNet-NG stopped ${esc(String(d.fakenet.died_at))}s into the run.</b> The VM's adapters were switched off, but traffic after that point may have reached the internet.</div>` : ""}
+      ${d.early_finish ? `<div class="k">Integrity</div><div style="color:var(--amber)"><b>The report arrived before the observation window ended.</b> The sample may have interfered with the monitor; treat these results with care.</div>` : ""}
+      ${(d.isolation_failed || []).length ? `<div class="k">Isolation</div><div style="color:var(--red)"><b>Sample was not run: the sandbox failed its isolation check.</b> ${esc(d.isolation_failed.join("; "))}</div>` : ""}
+      ${d.network_isolated === false ? `<div class="k">Isolation</div><div style="color:var(--red)"><b>The VM had a network route even though networking was off.</b> Treat this run as network-exposed.</div>` : ""}
+      ${d.vgpu_isolated === false ? `<div class="k">Isolation</div><div style="color:var(--red)"><b>The host GPU was visible inside the VM</b> (${esc((d.display_adapters || []).join(", "))}). GPU sharing is an escape surface${(d.isolation_failed || []).length ? ", so the sample was not run" : ""}.</div>`
+        : d.vgpu_isolated ? `<div class="k">Isolation</div><div>GPU isolated (${esc((d.display_adapters || []).join(", "))})</div>` : ""}
+      ${pcap ? `<div class="k">Capture</div><div><a href="${pcap}">Download capture.pcapng</a></div>` : ""}</div></div>
+    ${det.process_tree && det.process_tree.length ? sect("Process tree", true, ptree(det.process_tree)) : ""}
+    ${sect(`New processes <span class="badge">${(d.new_processes || []).length}</span>`, (d.new_processes || []).length > 0, list((d.new_processes || []).map((p) => `${p.name} (pid ${p.pid}) ${p.cmd || ""}`)))}
+    ${(d.dropped || []).length ? sect(`Collected payloads <span class="badge">${d.dropped.length}</span>`, true, `<p class="small" style="margin-bottom:8px">Copied out of the VM and added to this case as samples (static triage only).</p><div class="tbl"><table><tbody>${d.dropped.map((x) => `<tr><td class="mono break">${esc(x.path)}</td><td>${fmtSize(x.size)}</td><td class="mono small">${esc(x.sha256.slice(0, 16))}…</td></tr>`).join("")}</tbody></table></div>`) : ""}
+    ${sect(`Dropped files <span class="badge">${(d.new_files || []).length}</span>`, false, list(d.new_files))}
+    ${sect(`Persistence <span class="badge">${persist.length}</span>`, persist.length > 0, list(persist))}
+    ${sect(`Network <span class="badge">${(d.network || []).length}</span>`, (d.network || []).length > 0, list(d.network) + beacons(d) + `<div class="sublabel">DNS</div>` + list(d.dns))}
+    ${d.fakenet ? fakenetHtml(d.fakenet) : ""}
+    ${sysmonHtml(d)}
+    ${shot ? sect("Screenshot", true, `<a href="${shot}" target="_blank" rel="noopener"><img class="shot" src="${shot}" alt="Sandbox desktop at the end of the run"></a>`) : ""}
+  </div>`;
+}
+function fakenetHtml(f) {
+  const urls = f.urls || [], doms = f.domains || [], conns = f.connections || [];
+  return sect(`Simulated network <span class="badge">${doms.length + urls.length}</span>`, doms.length + urls.length > 0, `
+    ${!f.started ? `<div class="none" style="color:var(--red)">FakeNet-NG did not start${f.error ? ": " + esc(f.error) : ""}. The sample was not run.</div>` : ""}
+    <p class="small" style="margin-bottom:8px">What the sample asked for. Every answer it got was fake; these names and URLs are added to the case IOCs.</p>
+    <div class="sublabel">Domains requested <span class="badge">${doms.length}</span></div>${list(doms)}
+    <div class="sublabel">URLs requested <span class="badge">${urls.length}</span></div>${list(urls.map((u) => `${u.method || ""} ${u.url}`.trim()))}
+    ${conns.length ? `<div class="sublabel">Connections diverted <span class="badge">${conns.length}</span></div>${list(conns.map((c) => `${c.process} (pid ${c.pid}) → ${c.ip}:${c.port}${c.proto ? "/" + c.proto : ""}`))}` : ""}
+    ${f.log ? `<details style="margin-top:8px"><summary class="small">FakeNet-NG log${f.log_truncated ? " (first 256 KB)" : ""}</summary><pre>${esc(f.log)}</pre></details>` : ""}`);
+}
+function sysmonHtml(d) {
+  const b = d.behavior;
+  if (!b) return d.sysmon_event_count ? sect(`Sysmon events <span class="badge">${d.sysmon_event_count}</span>`, false,
+    list((d.sysmon_events || []).slice(0, 80).map((ev) => `#${ev.id} ${ev.time}  ${ev.msg || JSON.stringify(ev.data || {})}`))) : "";
+  const tbl = (rows, cols) => rows.length ? `<div class="tbl"><table><tbody>${rows.slice(0, 300).map((r) => `<tr>${cols.map((c) => `<td class="${c[1] || ""}">${esc(c[0](r))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : `<div class="none">None</div>`;
+  const nm = (p) => String(p || "").split("\\").pop();
+  return sect(`Sysmon behaviour <span class="badge">${d.sysmon_event_count || 0} events</span>`, true, `
+    ${(b.lsass_access || []).length ? `<div class="sublabel" style="color:var(--red)">LSASS access (credential dumping)</div>${tbl(b.lsass_access, [[(r) => nm(r.source), "mono"], [(r) => "access " + r.access, "small"]])}` : ""}
+    ${(b.remote_threads || []).length ? `<div class="sublabel" style="color:var(--red)">Remote threads (injection)</div>${tbl(b.remote_threads, [[(r) => `${nm(r.source)} → ${nm(r.target)}`, "mono"]])}` : ""}
+    <div class="sublabel">Processes started <span class="badge">${(b.processes || []).length}</span></div>${tbl(b.processes || [], [[(r) => r.name + (r.launcher ? " (launcher)" : ""), "mono"], [(r) => r.cmd, "small mono break"], [(r) => r.integrity, "small"]])}
+    <div class="sublabel">Connections <span class="badge">${(b.network || []).length}</span></div>${tbl(b.network || [], [[(r) => nm(r.image), "mono"], [(r) => `${r.dst_host || r.dst_ip}:${r.dst_port} ${r.proto}`, "mono break"]])}
+    <div class="sublabel">DNS queries <span class="badge">${(b.dns || []).length}</span></div>${tbl(b.dns || [], [[(r) => r.query, "mono break"], [(r) => nm(r.image), "small"]])}
+    <div class="sublabel">Registry writes <span class="badge">${(b.registry || []).length}</span></div>${tbl(b.registry || [], [[(r) => r.key, "mono break small"], [(r) => r.details, "small break"]])}
+    <div class="sublabel">Files created <span class="badge">${(b.files || []).length}</span></div>${tbl(b.files || [], [[(r) => r.path, "mono break small"], [(r) => nm(r.image), "small"]])}
+    ${(b.file_deletes || []).length ? `<div class="sublabel">Files deleted <span class="badge">${b.file_deletes.length}</span></div>${tbl(b.file_deletes, [[(r) => r.path, "mono break small"], [(r) => nm(r.image), "small"]])}` : ""}`);
+}
+const epHost = (ep) => { const e = String(ep).split(" ")[0]; return e.startsWith("[") ? e.slice(1).split("]")[0] : e.includes(":") ? e.slice(0, e.lastIndexOf(":")) : e; };
+function ptree(roots) {
+  const node = (n) => `<li><span class="mono">${esc(n.name || "?")}</span> <span class="small">pid ${esc(String(n.pid))}</span>${n.cmd ? `<div class="small mono break">${esc(String(n.cmd).slice(0, 220))}</div>` : ""}${(n.children || []).length ? `<ul>${n.children.map(node).join("")}</ul>` : ""}</li>`;
+  return `<ul class="ptree">${roots.map(node).join("")}</ul>`;
+}
+function beacons(d) {
+  const tl = d.net_timeline || []; if (!tl.length) return "";
+  const first = tl[0].t, seen = {};
+  tl.forEach((s) => (s.endpoints || []).forEach((ep) => { const h = epHost(ep); (seen[h] = seen[h] || []).push(Math.round((s.t - first) * 10) / 10); }));
+  const rows = Object.entries(seen).map(([h, ts]) => {
+    const u = [...new Set(ts)], iv = u.slice(1).map((t, i) => Math.round((t - u[i]) * 10) / 10);
+    const avg = iv.length ? iv.reduce((a, b) => a + b, 0) / iv.length : 0, jit = iv.length ? Math.max(...iv) - Math.min(...iv) : 0;
+    const beacon = iv.length >= 3 && avg > 0 && jit <= Math.max(2, .4 * avg);
+    return `<tr><td class="mono">${esc(h)}</td><td>${u.length}</td><td>${beacon ? `<span class="badge hi">beacon ~${avg.toFixed(1)}s</span>` : "—"}</td></tr>`;
+  }).join("");
+  return `<div class="sublabel">Contact pattern</div><div class="tbl"><table><thead><tr><th>Host</th><th>Contacts</th><th>Pattern</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function detonate(sid, timeout, net) {
+  if (net !== "off" && !await netAsk(net)) return;
+  const r = await api(`/api/lab/sample/${sid}/detonate`, { timeout, ...netBody(net), do_detonate: true });
+  if (r.error) return toast(r.error, true);
+  DETONATING[sid] = true; toast("Detonation started. This page updates when it's done.");
+  if (cur.sid === sid) renderSample(true);
+}
+async function diffRuns(sid, runs) {
+  const [b, a] = runs, box = $("d-diffbox"); box.innerHTML = `<div class="card"><span class="spin"></span></div>`;
+  const r = await api(`/api/lab/sample/${sid}/diff`, { run_a: a.id, run_b: b.id });
+  if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
+  const blk = (label, g) => `<div class="sublabel">${label}</div>` + (g.only_b.length || g.only_a.length
+    ? `${g.only_b.length ? `<div class="small" style="color:var(--green)">Only in the newer run</div>${list(g.only_b)}` : ""}${g.only_a.length ? `<div class="small" style="color:var(--red)">Only in the older run</div>${list(g.only_a)}` : ""}` : `<div class="none">Same in both</div>`);
+  box.innerHTML = `<div class="card"><div class="row"><h3 class="grow" style="margin:0">Newer run vs older run</h3><button class="ghost sm" id="diff-x">Close</button></div><div style="display:grid;gap:8px;margin-top:6px">
+    ${blk("Processes", r.processes)}${blk("Files", r.files)}${blk("Network", r.network)}${blk("Run keys", r.runkeys)}${blk("Scheduled tasks", r.tasks)}</div></div>`;
+  $("diff-x").onclick = () => box.innerHTML = "";
+}
+
+// threat intel
+const fmtSeen = (v) => !v ? "" : typeof v === "number" ? new Date(v * 1000).toLocaleDateString() : String(v).slice(0, 10);
+function tabIntel() {
+  const sid = SAMPLE.s.id, r = INTEL[sid], ti = (LAB && LAB.intel) || [], on = ti.filter((p) => p.configured).length;
+  if (r === "pending") { $("tab").innerHTML = `<div class="card"><div class="row"><span class="spin"></span> Checking ${plural(on, "source")}…</div></div>`; return; }
+  if (!r) {
+    $("tab").innerHTML = `<div class="card"><div class="empty"><b>Check this hash against threat-intel sources</b>
+      Only the SHA-256 is sent. The file itself is never uploaded.<br>${on} of ${ti.length} sources are ready${on < ti.length ? ` · <a href="#/settings">Add API keys</a>` : ""}
+      <div><button class="primary" id="i-go" ${on ? "" : "disabled"}>Look up hash</button></div></div></div>`;
+    $("i-go").onclick = () => runIntel(sid, false); return;
+  }
+  const s = r.summary;
+  $("tab").innerHTML = `<div class="stack"><div class="card"><div class="row">
+      <span class="badge ${s.hits ? s.verdict : ""}" style="height:26px;font-size:12.5px">${s.hits ? cap(s.verdict) : "No hits"}</span>
+      <span class="grow">${s.hits ? `Known to ${s.hits} of ${plural(s.configured, "source")}` : `None of ${plural(s.configured, "source")} has seen this hash`}</span>
+      <span class="small">Checked ${new Date(s.checked * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><button class="sm" id="i-refresh">Refresh</button></div>
+      ${s.labels.length ? `<div class="chips" style="margin-top:12px">${s.labels.map((l) => `<span class="chip attck">${esc(l)}</span>`).join("")}</div>` : ""}</div>
+    <div class="igrid">${r.providers.map((p) => `<div class="prov ${p.configured ? "" : "off"}"><div class="ph">${esc(p.name)}${p.found ? `<span class="badge ${p.verdict}">${cap(p.verdict)}</span>` : ""}${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">Open ↗</a>` : ""}</div>
+      ${!p.configured ? `<div class="small">No API key · <a href="#/settings">Add one</a></div>` : p.error ? `<div class="small" style="color:var(--red)">${esc(p.error)}</div>` : !p.found ? `<div class="small">Not seen</div>`
+        : `${p.score ? `<div class="ps">${esc(p.score)}</div>` : ""}${p.label ? `<div class="mono">${esc(p.label)}</div>` : ""}${(p.tags || []).length ? `<div class="chips">${p.tags.slice(0, 5).map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : ""}${p.first_seen ? `<div class="small">First seen ${esc(fmtSeen(p.first_seen))}</div>` : ""}`}</div>`).join("")}</div></div>`;
+  $("i-refresh").onclick = () => runIntel(sid, true);
+}
+async function runIntel(sid, refresh) {
+  INTEL[sid] = "pending"; if (cur.sid === sid && cur.tab === "intel") tabIntel();
+  const r = await api(`/api/lab/sample/${sid}/intel`, { refresh });
+  if (r.error) { delete INTEL[sid]; toast(r.error, true); } else INTEL[sid] = r;
+  if (cur.view === "sample" && cur.sid === sid) renderSample(true);
+}
+
+// ============================================================ Threat groups
+let ACT_IMPORTING = false, ACT_Q = "";
+async function viewActors() {
+  setNav("actors"); cur = { view: "actors" };
+  const r = await api("/api/lab/actors"); if (cur.view !== "actors") return;
+  const all = r.actors || [];
+  page(`
+  <div class="page-head"><div><h1>Threat groups</h1><p class="sub">Track the groups behind your cases: aliases, known malware, techniques, and every sample and case you've linked to them.</p></div>
+    <div class="row"><button id="ac-import" ${ACT_IMPORTING ? "disabled" : ""} title="MITRE ATT&CK groups, MISP Galaxy threat actors, Malpedia family attributions">${ACT_IMPORTING ? `<span class="spin"></span> Importing…` : all.length ? "Update from public sources" : "Import public group data"}</button><button class="primary" id="ac-new">New group</button></div></div>
+  <div id="ac-form"></div>
+  <div class="card flush"><div style="padding:14px 16px"><input id="ac-q" placeholder="Search name, alias, malware family, country, technique…" style="width:100%" value="${esc(ACT_Q)}" aria-label="Search groups"></div>
+    <div id="ac-list"></div></div>
+  <p class="small" style="margin-top:12px">Public data: <a href="https://attack.mitre.org/groups/" target="_blank" rel="noopener">MITRE ATT&amp;CK groups</a>, <a href="https://github.com/MISP/misp-galaxy" target="_blank" rel="noopener">MISP Galaxy</a> and <a href="https://malpedia.caad.fkie.fraunhofer.de/" target="_blank" rel="noopener">Malpedia</a>. Updating keeps your own edits and notes.</p>`);
+  const render = () => {
+    const q = ACT_Q.toLowerCase().trim();
+    const rows = all.filter((a) => !q || [a.name, a.aliases, a.families, a.country, a.mitre_id, a.techniques, a.motivation].join(" ").toLowerCase().includes(q)).slice(0, 300);
+    $("ac-list").innerHTML = rows.length ? `<table><thead><tr><th>Group</th><th class="hide-sm">Known malware</th><th class="hide-sm">Country</th><th>Linked</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr class="link" data-href="#/actor/${a.id}">
+      <td><b>${esc(a.name)}</b>${a.mitre_id ? ` <span class="small mono">${esc(a.mitre_id)}</span>` : ""}<div class="small break">${esc((a.aliases || "").slice(0, 140))}</div></td>
+      <td class="small hide-sm break">${esc((a.families || "").slice(0, 120))}</td><td class="small hide-sm">${esc(a.country || "")}</td><td>${a.link_count || ""}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty" style="padding:24px"><b>${all.length ? "No match" : "No groups yet"}</b>${all.length ? "" : "Import public group data, or add a group you're tracking."}</div>`;
+    wireRows();
+  };
+  render();
+  $("ac-q").oninput = () => { ACT_Q = $("ac-q").value; render(); };
+  $("ac-import").onclick = async () => {
+    if (!await ask({ title: "Download public threat-group data?", ok: "Download",
+      body: `<p>Downloads MITRE ATT&amp;CK (about 40 MB), the MISP Galaxy threat-actor list and Malpedia's family attributions, then merges them into your groups. Your own edits and notes are kept.</p>` })) return;
+    const r2 = await api("/api/lab/actors/import", {}); if (r2.error) return toast(r2.error, true);
+    ACT_IMPORTING = true; viewActors();
+  };
+  $("ac-new").onclick = () => actorForm(null);
+}
+function actorForm(a) {
+  const box = $("ac-form") || $("av-form");
+  const f = (id, label, val, ph = "") => `<div class="field"><label for="af-${id}">${label}</label><input id="af-${id}" value="${esc(val || "")}" placeholder="${esc(ph)}"></div>`;
+  box.innerHTML = `<div class="card" style="margin-bottom:20px"><h3>${a ? "Edit group" : "New group"}</h3>
+    <div class="two"><div>${f("name", "Name", a && a.name, "e.g. APT28")}${f("aliases", "Aliases", a && a.aliases, "comma-separated")}${f("mitre_id", "MITRE ID", a && a.mitre_id, "G0007")}${f("country", "Country", a && a.country)}</div>
+      <div>${f("families", "Known malware / tools", a && a.families, "comma-separated")}${f("techniques", "Techniques", a && a.techniques, "T1059.001, T1547.001…")}${f("motivation", "Motivation", a && a.motivation, "espionage, financial…")}</div></div>
+    <div class="field"><label for="af-description">Description</label><textarea id="af-description" style="width:100%;min-height:80px">${esc((a && a.description) || "")}</textarea></div>
+    <div class="field"><label for="af-notes">Your notes</label><textarea id="af-notes" style="width:100%;min-height:80px" placeholder="Infrastructure patterns, targeting, report links…">${esc((a && a.notes) || "")}</textarea></div>
+    <div class="row end" style="margin-top:12px"><button class="ghost" id="af-cancel">Cancel</button><button class="primary" id="af-save">Save</button></div></div>`;
+  $("af-cancel").onclick = () => box.innerHTML = "";
+  $("af-save").onclick = async () => {
+    const body = { id: a ? a.id : null };
+    for (const k of ["name", "aliases", "mitre_id", "country", "families", "techniques", "motivation", "description", "notes"]) body[k] = $("af-" + k).value;
+    const r = await api("/api/lab/actors/save", body); if (r.error) return toast(r.error, true);
+    toast("Group saved"); location.hash = `#/actor/${r.id}`; if (a) viewActor(r.id);
+  };
+  $("af-name").focus();
+}
+async function viewActor(aid) {
+  setNav("actors"); cur = { view: "actor", aid }; loading();
+  const p = await api(`/api/lab/actors/${aid}`); if (cur.view !== "actor" || cur.aid !== aid) return;
+  if (p.error) return page(`<div class="empty"><b>Group not found</b><a class="btn" href="#/actors">Back to groups</a></div>`);
+  const a = p.actor, chips = (s, cls = "") => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const known = chips(a.techniques), seen = new Set(p.attck_observed);
+  page(`
+  <nav class="crumbs"><a href="#/actors">Groups</a><span>/</span><b>${esc(a.name)}</b></nav>
+  <div class="page-head"><div><h1>${esc(a.name)}</h1><p class="sub">${[a.mitre_id && `<a href="https://attack.mitre.org/groups/${esc(a.mitre_id)}/" target="_blank" rel="noopener">${esc(a.mitre_id)}</a>`, a.country && esc(a.country), a.motivation && esc(a.motivation), `source: ${esc(a.source)}`].filter(Boolean).join(" · ")}</p></div>
+    <div class="row"><button id="av-edit">Edit</button><button class="ghost red" id="av-del">Delete</button></div></div>
+  <div id="av-form"></div>
+  <div class="split"><div class="stack">
+    <div class="card"><h3>Linked to your investigations</h3>
+      ${p.cases.length ? `<div class="sublabel">Cases</div><div class="tbl"><table><tbody>${p.cases.map((c) => `<tr class="link" data-href="#/case/${c.id}"><td><b>${esc(c.name)}</b></td><td class="small">${esc(c.link.confidence)} confidence</td><td><button class="sm ghost" data-unlink="case:${c.id}">Unlink</button></td></tr>`).join("")}</tbody></table></div>` : ""}
+      ${p.samples.length ? `<div class="sublabel">Samples</div><div class="tbl"><table><tbody>${p.samples.map((s) => `<tr class="link" data-href="#/case/${s.case_id}/sample/${s.id}"><td>${riskBadge(s.risk)}</td><td class="mono" style="font-size:13px">${esc(s.filename)}</td><td class="small">${esc(s.confidence)}</td><td><button class="sm ghost" data-unlink="sample:${s.id}">Unlink</button></td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="none">Nothing linked yet. Link a case from its page, or a sample from its Investigate tab.</div>`}</div>
+    <div class="card"><h3>Techniques observed in linked samples</h3>${matrixHtml(p.attck_matrix)}
+      ${known.length ? `<p class="small" style="margin-top:10px">${p.attck_known_and_observed.length} of ${known.length} known techniques for this group were observed in your samples.</p>` : ""}</div>
+    <div class="card"><h3>Infrastructure from linked cases</h3>
+      <div class="sublabel">IPs</div>${list(p.iocs.ips)}<div class="sublabel">Domains</div>${list(p.iocs.domains)}<div class="sublabel">URLs</div>${list(p.iocs.urls)}</div>
+  </div>
+  <aside class="card">
+    ${a.aliases ? `<div class="sublabel">Aliases</div><div class="chips">${chips(a.aliases).map((x) => `<span class="chip">${esc(x)}</span>`).join("")}</div>` : ""}
+    ${a.families ? `<div class="sublabel">Known malware and tools</div><div class="chips">${chips(a.families).map((x) => `<span class="chip">${esc(x)}</span>`).join("")}</div>` : ""}
+    ${known.length ? `<div class="sublabel">Known techniques <span class="badge">${known.length}</span></div><div class="chips">${known.map((t) => `<a class="chip ${seen.has(t) ? "attck" : ""}" target="_blank" rel="noopener" href="https://attack.mitre.org/techniques/${esc(t.replace(".", "/"))}/" title="${seen.has(t) ? "Observed in your samples" : ""}">${esc(t)}</a>`).join("")}</div>` : ""}
+    ${a.description ? `<div class="sublabel">Description</div><p class="small" style="white-space:pre-wrap">${esc(a.description.replace(/\(Citation:[^)]*\)/g, "").slice(0, 2500))}</p>` : ""}
+    ${a.notes ? `<div class="sublabel">Your notes</div><p class="small" style="white-space:pre-wrap">${esc(a.notes)}</p>` : ""}
+  </aside></div>`);
+  wireRows();
+  main.querySelectorAll("[data-unlink]").forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    const [kind, id] = b.dataset.unlink.split(":");
+    const r = await api(`/api/lab/actors/${aid}/link`, { kind, target_id: id, unlink: true });
+    if (r.error) return toast(r.error, true); toast("Unlinked"); viewActor(aid);
+  });
+  $("av-edit").onclick = () => actorForm(a);
+  $("av-del").onclick = async () => {
+    if (!await ask({ title: `Delete ${a.name}?`, body: "<p>Removes the group and its links. Cases and samples are kept.</p>", ok: "Delete", danger: true })) return;
+    await api(`/api/lab/actors/${aid}/delete`, {}); toast("Group deleted"); location.hash = "#/actors";
+  };
+}
+
+// ============================================================ Rules
+let yrCur = null;
+const yrFile = (n) => /\.yara?$/i.test(n) ? n : n + ".yar";
+async function viewRules() {
+  setNav("rules"); cur = { view: "rules" };
+  const r = await api("/api/lab/yara"), rules = r.rules || [];
+  if (cur.view !== "rules") return;
+  page(`
+  <div class="page-head"><div><h1>YARA rules</h1><p class="sub">Every sample is scanned with these during static triage. Requires <span class="mono">yara-python</span>.</p></div>
+    <div class="row"><input id="yr-name" placeholder="new_rule_name" class="mono-in" style="width:200px" aria-label="New rule file name"><button class="primary" id="yr-new">New rule</button></div></div>
+  <div class="card flush"><div class="rules">
+    <div class="rlist">${rules.map((x) => `<a href="#" data-rule="${esc(x.name)}" class="${x.name === yrCur ? "on" : ""}"><span class="mono">${esc(x.name)}</span><span class="small">${plural(x.rule_count, "rule")}${x.builtin ? " · starter" : ""}</span></a>`).join("") || `<div class="none" style="padding:16px">No rules yet</div>`}</div>
+    <div class="editor"><div class="bar"><b class="grow mono" id="yr-title" style="font-size:13px;font-weight:500">Select a rule</b><span class="kbd hide-sm">Ctrl S</span>
+      <button class="sm" id="yr-save" disabled>Save</button><button class="sm ghost red" id="yr-del" disabled>Delete</button></div>
+      <div class="body"><div class="gutter" id="yr-gutter">1</div><textarea id="yr-text" spellcheck="false" placeholder="Pick a rule on the left, or create a new one." aria-label="Rule source"></textarea></div></div>
+  </div></div>`);
+  main.querySelectorAll("[data-rule]").forEach((a) => a.onclick = (e) => { e.preventDefault(); editRule(a.dataset.rule); });
+  const t = $("yr-text");
+  t.oninput = gutter; t.onscroll = () => $("yr-gutter").scrollTop = t.scrollTop;
+  t.onkeydown = (e) => {
+    if (e.key === "Tab") { e.preventDefault(); t.setRangeText("    ", t.selectionStart, t.selectionEnd, "end"); gutter(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (!$("yr-save").disabled) $("yr-save").click(); }
+  };
+  $("yr-new").onclick = () => {
+    const n = $("yr-name").value.trim(); if (!n) { $("yr-name").focus(); return toast("Name the rule file first", true); }
+    yrCur = n; $("yr-title").textContent = yrFile(n) + " (unsaved)";
+    t.value = `rule ${n.replace(/\.yara?$/i, "").replace(/[^A-Za-z0-9_]/g, "_")}\n{\n    meta:\n        description = ""\n    strings:\n        $a = "suspicious"\n    condition:\n        $a\n}\n`;
+    gutter(); $("yr-save").disabled = false; $("yr-del").disabled = true; $("yr-name").value = ""; t.focus();
+    main.querySelectorAll("[data-rule]").forEach((a) => a.classList.remove("on"));
+  };
+  $("yr-name").onkeydown = (e) => { if (e.key === "Enter") $("yr-new").click(); };
+  $("yr-save").onclick = async () => {
+    const r = await api("/api/lab/yara/save", { name: yrCur, text: t.value });
+    if (r.error) return toast(r.error, true);
+    toast(`${yrFile(yrCur)} saved`); yrCur = yrFile(yrCur); refreshState(); viewRules();
+  };
+  $("yr-del").onclick = async () => {
+    if (!await ask({ title: `Delete ${yrFile(yrCur)}?`, body: "<p>The rule file is removed from the lab's YARA folder.</p>", ok: "Delete", danger: true })) return;
+    const r = await api("/api/lab/yara/" + encodeURIComponent(yrCur) + "/delete", {});
+    if (r.error) return toast(r.error, true);
+    toast(`${yrFile(yrCur)} deleted`); yrCur = null; refreshState(); viewRules();
+  };
+  if (yrCur && rules.some((x) => x.name === yrCur)) editRule(yrCur);
+}
+function gutter() { const t = $("yr-text"); $("yr-gutter").textContent = Array.from({ length: Math.max(1, t.value.split("\n").length) }, (_, i) => i + 1).join("\n"); $("yr-gutter").scrollTop = t.scrollTop; }
+async function editRule(name) {
+  const r = await api("/api/lab/yara/" + encodeURIComponent(name)); if (r.error) return toast(r.error, true);
+  if (cur.view !== "rules") return;
+  yrCur = name; $("yr-title").textContent = yrFile(name); $("yr-text").value = r.text; gutter();
+  $("yr-save").disabled = false; $("yr-del").disabled = false;
+  main.querySelectorAll("[data-rule]").forEach((a) => a.classList.toggle("on", a.dataset.rule === name));
+}
+
+// ============================================================ Settings
+let DEF_BUSY = false, NG_BUSY = false;
+async function viewSettings() {
+  setNav("settings"); cur = { view: "settings" };
+  await refreshState();
+  if (cur.view !== "settings" || !LAB) return;
+  const df = LAB.defender || {}, ti = LAB.intel || [], key = Object.fromEntries(ti.map((p) => [p.id, p]));
+  const keyPill = (id) => key[id] && key[id].key_set ? `<span class="badge ok">Key set</span>` : key[id] && !key[id].key_required ? `<span class="badge">Optional</span>` : `<span class="badge">Not set</span>`;
+  const defState = DEF_BUSY ? `<span class="spin"></span> Waiting for you to approve the Windows prompt…`
+    : !df.available ? "Microsoft Defender wasn't detected on this PC."
+    : df.excluded ? `On. Verified ${esc(fmtDate(df.verified))}.` : df.verified ? `Off. Verified ${esc(fmtDate(df.verified))}.` : "Off. Defender scans these folders.";
+  const ng = LAB.netguard || {};
+  const ngState = NG_BUSY ? `<span class="spin"></span> Waiting for you to approve the Windows prompt…`
+    : !ng.available ? "Couldn't read Windows Firewall on this PC."
+    : ng.enabled ? `On. Checked live against Windows Firewall${ng.verified ? `; last changed ${esc(fmtDate(ng.verified))}` : ""}.`
+    : ng.installed ? "Not fully active. See the checks below." : "Off. A networked sandbox can reach services on this PC.";
+  page(`
+  <div class="page-head"><div><h1>Settings</h1><p class="sub">API keys are kept in memory for this session. Set the environment variables shown to keep them across restarts.</p></div></div>
+
+  <section class="set"><div><h2>Microsoft Defender</h2><p class="sub">Real-time protection deletes real samples as soon as they land in the lab. Excluding only the lab's sample folders keeps them intact.</p></div>
+    <div>
+      <div class="toggle-row"><div class="grow"><b>Exclude the lab's sample folders</b><span class="small" id="def-state">${defState}</span></div>
+        ${sw("def-sw", df.excluded === true, df.available && !DEF_BUSY ? 'aria-label="Exclude the lab sample folders from Defender"' : "disabled")}</div>
+      <div class="kv" style="margin-top:16px">
+        <div class="k">Folders</div><div>${(df.paths || []).map((p) => `<div class="mono break">${esc(p)}</div>`).join("")}</div>
+        <div class="k">Real-time</div><div>${df.realtime == null ? "Unknown" : df.realtime ? "On" : "Off"}${df.tamper ? " · Tamper protection on" : ""}</div>
+        ${df.last_error ? `<div class="k">Last error</div><div style="color:var(--red)">${esc(df.last_error)}</div>` : ""}</div>
+      <p class="small" style="margin-top:12px">Windows asks for administrator approval every time you change this. The rest of the PC stays protected, and samples are stored as <span class="mono">sample.bin</span> and never run here.</p>
+    </div></section>
+
+  <section class="set"><div><h2>Host network guard</h2><p class="sub">When a detonation has networking (Simulated, Internet or Full), this PC's own firewall blocks the sandbox's virtual network from reaching this PC. The sample can't remove it from inside the VM.</p></div>
+    <div>
+      <div class="toggle-row"><div class="grow"><b>Block the sandbox from reaching this PC</b><span class="small" id="ng-state">${ngState}</span></div>
+        ${sw("ng-sw", ng.enabled === true, ng.available && !NG_BUSY && (ng.adapter || ng.installed) ? 'aria-label="Block the sandbox network from reaching this PC"' : "disabled")}</div>
+      <div class="kv" style="margin-top:16px">
+        <div class="k">Adapter</div><div>${ng.adapter ? `<span class="mono">${esc(ng.adapter)}</span>${ng.subnet ? ` · <span class="mono">${esc(ng.subnet)}</span> (changes when Windows restarts; the rules follow the adapter)` : ""}` : "Not present right now"}</div>
+        <div class="k">Rules</div><div>${ng.rules || 0} of 4 active. When on, inbound TCP, UDP, ICMPv4 and ICMPv6 from the sandbox switch are blocked; DHCP and DNS to the switch stay open so networked runs still work.</div>
+        ${(ng.problems || []).map((p) => `<div class="k">Check</div><div style="color:var(--amber)">${esc(p)}</div>`).join("")}
+        ${ng.last_error ? `<div class="k">Last error</div><div style="color:var(--red)">${esc(ng.last_error)}</div>` : ""}</div>
+      <p class="small" style="margin-top:12px">Windows asks for administrator approval every time you change this. It doesn't stop traffic to the internet or your LAN, which goes out through Windows' NAT rather than into this PC. Other Hyper-V VMs on the Default Switch are blocked from this PC too while it's on.</p>
+    </div></section>
+
+  <section class="set"><div><h2>Threat intel</h2><p class="sub">Hash lookups only; samples are never uploaded. Leave a field blank to keep its current key.</p></div>
+    <div>
+      <div class="field"><label for="k-vt">VirusTotal ${keyPill("vt")}</label><input type="password" id="k-vt" placeholder="VT_API_KEY" autocomplete="off"></div>
+      <div class="field"><label for="k-abusech">abuse.ch ${keyPill("mb")} <span class="small">MalwareBazaar, ThreatFox, URLhaus</span></label><input type="password" id="k-abusech" placeholder="ABUSECH_API_KEY (Auth-Key from auth.abuse.ch)" autocomplete="off"></div>
+      <div class="field"><label for="k-ha">Hybrid Analysis ${keyPill("ha")}</label><input type="password" id="k-ha" placeholder="HA_API_KEY" autocomplete="off"></div>
+      <div class="field"><label for="k-otx">AlienVault OTX ${keyPill("otx")}</label><input type="password" id="k-otx" placeholder="OTX_API_KEY" autocomplete="off"></div>
+      <div class="row end" style="margin-top:16px"><button class="primary" id="k-save">Save keys</button></div>
+    </div></section>
+
+  <section class="set"><div><h2>Sample repository</h2><p class="sub">virus.exchange, vx-underground's sample database, for fetching and searching by hash.</p></div>
+    <div>
+      <div class="field"><label for="k-vxurl">API URL</label><input id="k-vxurl" value="${esc(LAB.repo_url || "")}" placeholder="https://virus.exchange/api"></div>
+      <div class="field"><label for="k-vx">API key ${LAB.repo_configured ? `<span class="badge ok">Key set</span>` : `<span class="badge">Not set</span>`}</label><input type="password" id="k-vx" placeholder="VX_API_KEY" autocomplete="off"></div>
+      <div class="row end" style="margin-top:16px"><button class="primary" id="k-vx-save">Save</button></div>
+    </div></section>
+
+  <section class="set"><div><h2>Sysmon</h2><p class="sub">Detailed process, network and registry events from inside each sandbox run.</p></div>
+    <div class="toggle-row"><div class="grow"><b>${LAB.sysmon && LAB.sysmon.ready ? "Installed in the lab's tools folder" : "Not set up"}</b><span class="small">Downloaded from Microsoft Sysinternals and installed inside the sandbox only.</span></div>
+      <button id="sm-go" class="${LAB.sysmon && LAB.sysmon.ready ? "" : "primary"}">${LAB.sysmon && LAB.sysmon.ready ? "Download again" : "Download Sysmon"}</button></div></section>
+
+  ${(LAB.setup_pending || []).length ? `<div class="notice"><span class="nic">!</span><div class="grow"><b>Some install steps didn't finish:</b> ${esc(LAB.setup_pending.join(", "))}.
+    Retry them on this page (common causes: no internet during install, Defender holding a download, or the sandbox network adapter only appearing after the restart).</div><button class="sm ghost" id="sp-x">Dismiss</button></div>` : ""}
+
+  <section class="set"><div><h2>Analysis tools</h2><p class="sub">Optional extras that deepen static analysis. None of them run the sample.</p></div>
+    <div class="kv">
+      <div class="k">capa</div><div class="row" style="gap:10px">${toolCell("capa", LAB.capa, "Capability detection runs on every PE.")}</div>
+      <div class="k">FakeNet-NG</div><div class="row" style="gap:10px">${toolCell("fakenet", LAB.fakenet && LAB.fakenet.ready, "The <b>Simulated</b> network mode is available. It only ever runs inside the sandbox.")}</div>
+      <div class="k">Similarity</div><div>${(LAB.tools || {}).tlsh && LAB.tools.tlsh.ready ? `<span class="badge ok">Ready</span> TLSH fuzzy hashing powers “Related samples”.` : `<span class="badge ok">Ready</span> Related samples are matched by imphash, string overlap (built-in MinHash) and shared IOCs. TLSH is used too when <span class="mono">py-tlsh</span> is installed.`}</div>
+      <div class="k">Threat groups</div><div>${LAB.actor_count ? `${LAB.actor_count} tracked.` : "None yet."} <a href="#/actors">Manage groups</a></div>
+    </div></section>`, true);
+  $("def-sw").onchange = () => setDefender($("def-sw").checked);
+  $("ng-sw").onchange = () => setNetGuard($("ng-sw").checked);
+  const saveKeys = async (body, btn) => {
+    if (!Object.values(body).some((v) => v)) return toast("Nothing to save. Enter a value first.", true);
+    btn.disabled = true; const r = await api("/api/lab/config", body); btn.disabled = false;
+    if (r.error) return toast(r.error, true);
+    toast("Saved"); viewSettings();
+  };
+  $("k-save").onclick = () => saveKeys({ vt_key: $("k-vt").value, abusech_key: $("k-abusech").value, ha_key: $("k-ha").value, otx_key: $("k-otx").value }, $("k-save"));
+  $("k-vx-save").onclick = () => saveKeys({ vx_url: $("k-vxurl").value.trim(), vx_key: $("k-vx").value }, $("k-vx-save"));
+  $("sm-go").onclick = async () => {
+    $("sm-go").disabled = true; $("sm-go").innerHTML = `<span class="spin"></span> Downloading`;
+    const r = await api("/api/lab/sysmon/setup", {}); if (r.error) { toast(r.error, true); viewSettings(); }
+  };
+  if ($("sp-x")) $("sp-x").onclick = async () => { await api("/api/lab/setup-pending/clear", {}); viewSettings(); };
+  main.querySelectorAll("[data-tool]").forEach((b) => b.onclick = async () => {
+    const t = b.dataset.tool; TOOL_BUSY[t] = true; viewSettings();
+    const r = await api(`/api/lab/tools/${t}/setup`, {});
+    if (r.error) { delete TOOL_BUSY[t]; toast(r.error, true); viewSettings(); }
+  });
+}
+const TOOL_BUSY = {};
+const TOOL_LINKS = { capa: "https://github.com/mandiant/capa", fakenet: "https://github.com/mandiant/flare-fakenet-ng" };
+function toolCell(tool, ready, readyText) {
+  const v = ((LAB.tools || {})[tool] || {}).version;
+  const btn = TOOL_BUSY[tool] ? `<button disabled><span class="spin"></span> Downloading</button>`
+    : `<button class="sm ${ready ? "" : "primary"}" data-tool="${tool}">${ready ? "Update" : "Download"}</button>`;
+  return `<div class="grow">${ready ? `<span class="badge ok">Installed${v ? " " + esc(v) : ""}</span> ${readyText}`
+    : `Not installed. Downloads the latest official release from <a href="${TOOL_LINKS[tool]}" target="_blank" rel="noopener">GitHub</a> over HTTPS (checked against GitHub's published SHA-256 when the release has one).`}</div>${btn}`;
+}
+async function setDefender(exclude) {
+  $("def-sw").checked = !exclude;   // the switch only moves once Windows confirms the change
+  const df = LAB.defender || {};
+  const ok = await ask(exclude
+    ? { title: "Exclude the lab's sample folders?", ok: "Continue",
+        body: `<p>Defender will stop scanning these folders:</p>${(df.paths || []).map((p) => `<div class="mono break">${esc(p)}</div>`).join("")}<p>Windows will ask you to approve this as an administrator.</p>` }
+    : { title: "Scan the lab folders again?", ok: "Continue",
+        body: `<p>Defender will scan the lab's sample folders again and will probably delete the samples stored there.</p><p>Windows will ask you to approve this as an administrator.</p>` });
+  if (!ok) return;
+  DEF_BUSY = true; viewSettings();
+  const r = await api("/api/lab/defender", { exclude });
+  DEF_BUSY = false;
+  if (r.error) toast(r.error, true); else toast(r.excluded ? "Lab folders excluded from Defender" : "Defender scans the lab folders again");
+  if (cur.view === "settings") viewSettings(); else refreshState();
+}
+
+async function setNetGuard(enable) {
+  $("ng-sw").checked = !enable;   // moves only once the firewall confirms
+  const ok = await ask(enable
+    ? { title: "Turn on the host network guard?", ok: "Continue",
+        body: `<p>Adds four Windows Firewall rules on this PC that block inbound traffic from the sandbox's virtual network (<span class="mono">${esc((LAB.netguard || {}).adapter || "vEthernet (Default Switch)")}</span>), apart from DHCP and DNS.</p><p>Other Hyper-V VMs on the Default Switch are blocked from this PC too. Windows will ask you to approve this as an administrator.</p>` }
+    : { title: "Turn off the host network guard?", ok: "Turn off", danger: true,
+        body: `<p>A networked sandbox will be able to reach services on this PC again.</p><p>Windows will ask you to approve this as an administrator.</p>` });
+  if (!ok) return;
+  NG_BUSY = true; viewSettings();
+  const r = await api("/api/lab/netguard", { enable });
+  NG_BUSY = false;
+  if (r.error) toast(r.error, true); else toast(r.enabled ? "Host network guard on" : "Host network guard off");
+  if (cur.view === "settings") viewSettings(); else refreshState();
+}
+
+// ============================================================ live events
+function handle(e) {
+  if (e.session !== "lab") return;
+  switch (e.type) {
+    case "lab_log":
+      if (Q.running) { Q.log.push({ t: now(), text: e.text }); if (cur.view === "home") renderProgress(); }
+      else if (e.error) {   // a background job (detonation, Sysmon download) failed before it could report
+        toast(e.text, true);
+        for (const k in DETONATING) delete DETONATING[k];
+        if (cur.view === "sample") renderSample(true);
+      }
+      break;
+    case "lab_quick_done": quickDone(e); break;
+    case "lab_run_started": refreshState(); break;
+    case "lab_run_done":
+      if (Q.running) break;   // part of a quick run; quickDone handles it
+      delete DETONATING[e.sample_id]; refreshState();
+      toast("Detonation finished" + (e.verdict ? `: ${e.verdict}` : ""));
+      if (cur.view === "sample" && cur.sid === e.sample_id) { SAMPLE.run = null; viewSample(cur.cid, cur.sid, cur.tab, true); }
+      break;
+    case "lab_sysmon": refreshState().then(() => { if (cur.view === "settings") viewSettings(); }); break;
+    case "lab_tool_ready":
+      delete TOOL_BUSY[e.tool];
+      if (e.error) toast(e.text, true); else toast(`${e.tool === "fakenet" ? "FakeNet-NG" : e.tool} installed`);
+      refreshState().then(() => { if (cur.view === "settings") viewSettings(); });
+      break;
+    case "lab_actors_imported":
+      if (e.error) toast("Threat-group import failed: " + e.text, true);
+      else toast(`Threat groups: ${e.created} added, ${e.updated} updated${e.errors && e.errors.length ? ` (${e.errors.length} source(s) failed)` : ""}`, !!(e.errors && e.errors.length));
+      ACT_IMPORTING = false; refreshState(); if (cur.view === "actors") viewActors();
+      break;
+  }
+}
+// Theme: follows Windows' light/dark setting until the viewer picks one with the header button.
+function applyTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+}
+applyTheme(store.get("theme", null));
+async function start() {
+  $("open-sb").onclick = () => openSandbox();
+  $("theme").onclick = () => {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark"
+      : matchMedia("(prefers-color-scheme: dark)").matches;
+    const t = dark ? "light" : "dark"; store.set("theme", t); applyTheme(t);
+  };
+  loading();   // the first status call runs Defender / firewall checks and can take a few seconds
+  await refreshState();
+  if (LAB && !LAB.sandbox.available) OPTS.exec = false;   // nothing to detonate in; default to static analysis
+  route();
+  const es = new EventSource("/api/events");
+  es.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch {} };
+  setInterval(() => { if (!LAB || !LAB.sandbox.busy) refreshState(); }, 15000);
+}
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+MalLab: malware research lab for Windows
+
+MalLab is for analysing malware safely. Samples are stored by hash, never under their real name or extension, and they only run inside a disposable Windows Sandbox VM. Nothing runs on this PC itself.
+
+WHAT THIS INSTALLER SETS UP
+
+  Required, installed automatically:
+    - MalLab itself (no Python needed), including YARA scanning and
+      similar-sample matching
+    - Microsoft Edge WebView2 Runtime, if missing (draws MalLab's window)
+
+  Offered on the next pages (you choose):
+    - Windows Sandbox: needed to detonate samples. Turning it on needs a restart.
+      It requires Windows 10/11 Pro, Enterprise or Education with virtualization
+      enabled in the BIOS/UEFI. On Windows Home, static analysis and threat intel
+      still work, but detonation does not.
+    - Analysis tools, each downloaded from its official source during setup:
+        Sysmon (Microsoft Sysinternals): full process, network and registry events
+          inside the sandbox.
+        capa (Mandiant): what a program's code can do, mapped to MITRE ATT&CK.
+        FakeNet-NG (Mandiant): the "Simulated" network mode, a fake internet inside
+          the sandbox so samples can be watched talking to "C2" safely. It never
+          runs on this PC. Defender may flag its packet driver (WinDivert); MalLab
+          tells you if that happens.
+        Threat-group data from MITRE ATT&CK, MISP Galaxy and Malpedia.
+    - The host network guard: Windows Firewall rules that stop the sandbox from
+      reaching this PC. Windows asks you to approve it. If this installer turns
+      Windows Sandbox on, switch the guard on in Settings after the restart.
+    - A Microsoft Defender exclusion for MalLab's two sample folders only
+      (%LOCALAPPDATA%\MalLab\lab\quarantine and \runs). Without it, Defender deletes
+      samples as soon as they arrive. Windows asks you to approve it.
+    - Threat-intel API keys (VirusTotal, abuse.ch, Hybrid Analysis, AlienVault OTX,
+      virus.exchange). All optional. You can add them later in Settings.
+
+WHERE YOUR DATA GOES
+
+  Cases, quarantined samples, reports and YARA rules are kept in
+  %LOCALAPPDATA%\MalLab. Uninstalling asks whether to delete them.
+
+Only handle malware you are authorised to analyse.

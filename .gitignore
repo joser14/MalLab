@@ -1,0 +1,26 @@
+# Lab data: live malware samples, reports and the case database. Never commit.
+lab/
+**/quarantine/
+**/runs/
+*.db
+setup-pending.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Installer build output (rebuild with Installer\build.ps1)
+Installer/.venv/
+Installer/build/
+Installer/dist/
+Installer/Output/
+Installer/mallab.ico
+
+# Local editor / agent settings
+.claude/
+.vscode/
+.idea/
+*.log

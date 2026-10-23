@@ -1,0 +1,12 @@
+httpx
+starlette
+uvicorn
+# static analysis (optional but recommended; the engine degrades gracefully without them)
+pefile
+oletools
+py7zr       # unpack password-protected .7z (vx-underground ships samples as 7z, password "infected")
+pyzipper    # unpack AES-encrypted .zip (plain ZipCrypto zips work without it)
+# py-tlsh      # optional: fuzzy hashing for "Related samples" (similar-bytes matching)
+# yara-python  # optional: needs a C toolchain on Windows; enable for YARA scanning
+# python-magic-bin  # optional: richer file-type detection on Windows
+pytest
