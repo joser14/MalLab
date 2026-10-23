@@ -7,7 +7,9 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 HERE = Path(SPECPATH)
 ROOT = HERE.parent
 
-hidden = collect_submodules("uvicorn") + collect_submodules("mallab") + ["server"]
+# yaml is imported inside functions in mallab.sigma (Sigma rule parsing); name it explicitly so
+# PyInstaller's analysis can never miss it.
+hidden = collect_submodules("uvicorn") + collect_submodules("mallab") + ["server", "yaml"]
 datas = [(str(ROOT / "ui" / "lab.html"), "ui"), (str(ROOT / "ui" / "fonts"), "ui/fonts")]
 datas += collect_data_files("oletools")
 for optional in ("magic", "yara", "tlsh"):   # bundled when build.ps1 could install them
