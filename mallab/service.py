@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from . import (actors, archives, defender, diffing, fakenet, hostmon, intel, ioc_intel, netguard, sandbox,
-               htmlreport, signatures, static, tooling, verdict, yara_rules)
+               htmlreport, misp, signatures, static, tooling, verdict, yara_rules)
 from .samples import SampleSource, sha256_of
 from .store import Store
 
@@ -794,6 +794,19 @@ class MalLab:
             if key:
                 self.intel.set_key(env, key)
 
+    def set_misp(self, misp_url=None, misp_key=None, misp_verify=None):
+        misp.set_config(misp_url, misp_key, misp_verify)
+
+    def push_to_misp(self, case_id: str) -> dict:
+        """Push a case's consolidated IOCs to MISP as an Event, tagged with family and ATT&CK."""
+        detail = self.case_detail(case_id)
+        if not detail:
+            raise ValueError("no such case")
+        iocs = self.case_iocs(case_id)
+        cv = detail.get("verdict") or {}
+        attck = sorted({t for s in detail["samples"] for t in (self.detections(s["id"]).get("attck") or [])})
+        return misp.push(detail["case"]["name"], iocs, cv.get("families") or [], attck, cv.get("verdict", ""))
+
     # ---- cases ----------------------------------------------------------
 
     # ---- IOC enrichment (free online sources) ---------------------------
@@ -1000,6 +1013,7 @@ class MalLab:
             "sysmon": self.sysmon_status(),
             "capa": bool(static.find_capa(self.tools_dir)),
             "blu": self.blu_status(),
+            "misp": misp.status(),
             "tools": self.tools_status(),
             "setup_pending": self.setup_pending(),
             "actor_count": len(self.store.list_actors()),

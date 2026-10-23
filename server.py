@@ -480,7 +480,13 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
     async def config(request):
         b = await _body(request)
         lab.set_keys(**{k: b.get(k) for k in ("vx_key", "vx_url", "vt_key", "abusech_key", "ha_key", "otx_key")})
+        if any(b.get(k) is not None for k in ("misp_url", "misp_key", "misp_verify")):
+            lab.set_misp(b.get("misp_url"), b.get("misp_key"),
+                         None if b.get("misp_verify") is None else bool(b.get("misp_verify")))
         return JSONResponse({"ok": True, **await asyncio.to_thread(lab.state)})
+
+    async def case_misp(request):
+        return await _call(lab.push_to_misp, request.path_params["cid"])
 
     async def defender_route(request):
         if request.method == "GET":
@@ -543,6 +549,7 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/case/{cid}/compare", case_compare),
         Route("/api/lab/case/{cid}/report", case_report),
         Route("/api/lab/case/{cid}/report.html", case_html_report),
+        Route("/api/lab/case/{cid}/misp", case_misp, methods=["POST"]),
         Route("/api/lab/case/{cid}/iocs/export", case_ioc_export),
         Route("/api/lab/sample/{sid}/annotate", annotate, methods=["POST"]),
         Route("/api/lab/sample/{sid}/related", related),

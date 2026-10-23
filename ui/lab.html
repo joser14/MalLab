@@ -679,7 +679,8 @@ async function viewCase(cid) {
       <select id="c-report" aria-label="Report" ${samples.length ? "" : "disabled"}><option value="">Report…</option><option value="html-view">HTML — view</option><option value="html">HTML — download</option><option value="md">Markdown</option></select><button class="ghost red" id="c-del">Delete</button></div></div>
   <div class="row" style="margin-bottom:16px;gap:8px"><button class="sm" id="c-attck" ${samples.length ? "" : "disabled"}>ATT&amp;CK matrix</button>
     <button class="sm" id="c-timeline" ${samples.length ? "" : "disabled"}>Timeline</button>
-    <button class="sm" id="c-enrich" ${samples.length ? "" : "disabled"} title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button></div>
+    <button class="sm" id="c-enrich" ${samples.length ? "" : "disabled"} title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button>
+    ${LAB && LAB.misp && LAB.misp.configured ? `<button class="sm" id="c-misp" ${samples.length ? "" : "disabled"} title="Push this case's IOCs to your MISP instance">Push to MISP</button>` : ""}</div>
   <div id="c-compare-box"></div>
   <div class="split">
     <div class="stack">
@@ -762,6 +763,14 @@ async function viewCase(cid) {
     const r = await fetch(url); if (!r.ok) return toast("Couldn't build the report", true);
     const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob());
     a.download = slug + (kind === "md" ? "-report.md" : "-report.html"); a.click(); URL.revokeObjectURL(a.href);
+  };
+  if ($("c-misp")) $("c-misp").onclick = async () => {
+    if (!await ask({ title: "Push to MISP?", ok: "Push", body: `<p>This sends the case's consolidated IOCs (hashes, URLs, IPs, domains) and their family/ATT&CK tags to your MISP instance as a new Event.</p><p class="small">Only indicators are sent, never the sample.</p>` })) return;
+    const btn = $("c-misp"); btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`;
+    const r = await api(`/api/lab/case/${cid}/misp`); btn.disabled = false; btn.textContent = "Push to MISP";
+    if (r.error) return toast(r.error, true);
+    toast(`Pushed ${plural(r.attributes, "indicator")} to MISP (event ${r.event_id})`);
+    if (r.url) window.open(r.url, "_blank", "noopener");
   };
   $("c-iocs").onclick = async () => {
     const r = await api(`/api/lab/case/${cid}/iocs`); if (r.error) return toast(r.error, true);
