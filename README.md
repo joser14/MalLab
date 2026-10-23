@@ -18,9 +18,27 @@ Optional: check the download against `SHA256SUMS.txt` from the same release:
 Get-FileHash .\MalLab-Setup-1.2.1.exe -Algorithm SHA256
 ```
 
-Requirements: Windows 10/11 **Pro, Enterprise or Education** (for Windows Sandbox) with
-virtualization enabled in the BIOS/UEFI. On Windows Home, static analysis, YARA and threat intel
-work, but samples can't be detonated.
+Requirements: 64-bit Windows 10 (1903 or later) or Windows 11. Detonation needs Windows Sandbox:
+**Pro, Enterprise or Education**, virtualization (Intel VT-x / AMD-V) enabled in the BIOS/UEFI,
+about 4 GB of RAM and 2 CPU cores.
+
+### Without Windows Sandbox (Windows Home, older or low-spec laptops)
+
+MalLab still installs and runs: it's a small local server and one window, light enough for an old
+laptop. If the PC can't run Windows Sandbox, the installer says so and carries on.
+
+- **Works:** static triage (file type, PE details, strings, entropy, IOCs, Office macros, archives),
+  YARA and YARA Forge scanning, retrohunt, threat-intel lookups, threat-group tracking, IOC
+  enrichment, the verdict and score, the HTML report, MISP push, STIX export, and BLU MODE (host
+  observation, which executes nothing).
+- **Not available:** detonation, and what comes from it: behaviour, the process graph, Sigma hits on
+  live events, memory dumps and dropped files. Verdicts rest on static, YARA and intel evidence.
+- **Slower on weak hardware:** capa (a minute or more and a fair amount of RAM on big binaries),
+  YARA Forge scans of large files, and the first-run downloads of tools and threat-group data.
+- **Safety:** MalLab never executes a sample outside the sandbox, so analysing is safe. Don't open
+  files from the quarantine folder yourself. Microsoft Defender may delete samples as they're added;
+  turn on the Defender exclusion for MalLab's sample folders (installer or Settings) or expect some
+  files to vanish.
 
 ## Run from source (developers)
 
