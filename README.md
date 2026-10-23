@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="logo.webp" width="200" alt="GHOSTSHIELD LABS">
+  <br><b>GHOSTSHIELD LABS</b>
+</p>
+
 # MalLab
 
 A standalone malware research lab for Windows. Drop in a sample (or a password-protected
