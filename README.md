@@ -15,7 +15,7 @@ against threat-intel sources. Nothing runs on the host.
 Optional: check the download against `SHA256SUMS.txt` from the same release:
 
 ```
-Get-FileHash .\MalLab-Setup-1.2.1.exe -Algorithm SHA256
+Get-FileHash .\MalLab-Setup-1.2.2.exe -Algorithm SHA256
 ```
 
 Requirements: 64-bit Windows 10 (1903 or later) or Windows 11. Detonation needs Windows Sandbox:

@@ -9,7 +9,7 @@
 ; software may use it.
 
 #define MyAppName "MalLab"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.2.2"
 #define MyAppExe "MalLab.exe"
 
 [Setup]
