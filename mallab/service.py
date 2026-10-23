@@ -679,7 +679,8 @@ class MalLab:
                 "sigma": {"ready": (self.tools_dir / "sigma").is_dir(),
                           "version": tooling.installed_version("sigma", self.tools_dir),
                           "rules": sum(1 for _ in (self.tools_dir / "sigma").rglob("*.yml")) if (self.tools_dir / "sigma").is_dir() else 0},
-                "yara_forge": {"ready": any((self.yara_dir / "packs").glob("*.yar")) if (self.yara_dir / "packs").is_dir() else False,
+                "yara_forge": {"ready": any(f.suffix in (".yar", ".yara", ".mlx") for f in (self.yara_dir / "packs").iterdir())
+                               if (self.yara_dir / "packs").is_dir() else False,   # packs are stored encoded (.mlx)
                                "version": tooling.installed_version("yara_forge", self.tools_dir)},
                 "tlsh": {"ready": has_tlsh}}
 

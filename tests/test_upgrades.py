@@ -243,7 +243,7 @@ def test_new_tool_kinds_install(tmp_path):
     assert (tmp_path / "hollows_hunter64.exe").read_bytes() == b"MZ hh"
     with pytest.raises(tooling.ToolError):
         tooling.install("hollows_hunter", tmp_path, _client("hasherezade/hollows_hunter", "hollows_hunter64.exe", b"<html>"))
-    tooling.install("sigma", tmp_path, _client("SigmaHQ/sigma", "sigma_core.zip",
+    tooling.install("sigma", tmp_path, _client("SigmaHQ/sigma", "sigma_core+.zip",
                     _zip({"rules/windows/a.yml": RULE_ENC, "README.md": "x", "LICENSE.Detection.Rules.md": "DRL"})))
     assert (tmp_path / "sigma" / "rules" / "windows" / "a.yml").exists() and not (tmp_path / "sigma" / "README.md").exists()
     yd = tmp_path / "yara"
@@ -264,4 +264,5 @@ def test_encoded_pack_compiles_and_retrohunts(tmp_path):
     s = lab.ingest(lab.store.create_case("a")["id"], b"MZ ENC_MARKER", "a.exe")
     assert any(m["rule"] == "Enc_Hit" and m["source"] == "core" for m in lab.static_report(s["id"])["yara"]["matches"])
     assert lab.yara_packs()[0]["rule_count"] == 1
+    assert lab.tools_status()["yara_forge"]["ready"] is True     # an encoded pack counts as installed
     assert [h["filename"] for h in lab.retrohunt(name="core.yar.mlx")["hits"]] == ["a.exe"]

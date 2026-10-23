@@ -35,7 +35,9 @@ TOOLS = {
     "hollows_hunter": {"repo": "hasherezade/hollows_hunter", "asset": re.compile(r"^hollows_hunter64\.exe$", re.I), "web": "hollows_hunter64.exe",
                        "name": "hollows_hunter (pe-sieve)"},
     # Rule packs: data, not programs.
-    "sigma": {"repo": "SigmaHQ/sigma", "asset": re.compile(r"^sigma_core\.zip$", re.I), "web": "sigma_core.zip", "name": "SigmaHQ rules"},
+    # core+ = stable/test rules at medium, high and critical. Core alone (high/critical) missed common
+    # behaviour such as Run-key persistence; matching only the sample's own process tree keeps medium low-noise.
+    "sigma": {"repo": "SigmaHQ/sigma", "asset": re.compile(r"^sigma_core\+\.zip$", re.I), "web": "sigma_core+.zip", "name": "SigmaHQ rules"},
     "yara_forge": {"repo": "YARAHQ/yara-forge", "asset": re.compile(r"^yara-forge-rules-core\.zip$", re.I), "web": "yara-forge-rules-core.zip",
                    "name": "YARA Forge rules"},
 }

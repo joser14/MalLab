@@ -37,6 +37,24 @@ def test_clean_only_when_intel_says_so():
     assert v["verdict"] == "clean"
 
 
+def test_persistence_alone_is_suspicious_not_malicious():
+    # Seen on a real run: a harmless test script that adds a Run key. Installers do that too.
+    v = verdict.assess(static={"risk": 0}, detections=det(("Persistence via Run key", "high"),
+                                                          ("Dropped executable payload", "medium"),
+                                                          ("Sigma: Direct Autorun Keys Modification", "medium")),
+                       dynamic={"detonated": True})
+    assert v["verdict"] == "suspicious" and 50 <= v["score"] < 70
+    assert any("persistence" in r for r in v["reasons"])
+
+
+def test_persistence_with_corroboration_is_malicious():
+    base = (("Persistence via Run key", "high"),)
+    assert verdict.assess(detections=det(*base, ("LSASS memory access", "high")))["verdict"] == "malicious"
+    assert verdict.assess(detections=det(*base), intel={"verdict": "malicious", "hits": 2})["verdict"] == "malicious"
+    assert verdict.assess(static={"risk": 60}, detections=det(*base))["verdict"] == "malicious"
+    assert verdict.assess(detections=det(*base, ("Sigma: Something Bad", "high")))["verdict"] == "malicious"
+
+
 def test_medium_activity_is_suspicious():
     v = verdict.assess(static={"risk": 30}, detections=det(("Network download capability", "medium")))
     assert v["verdict"] == "suspicious"

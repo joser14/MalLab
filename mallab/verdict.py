@@ -14,13 +14,16 @@ import re
 VERDICTS = ("malicious", "suspicious", "clean", "unknown")
 _RANK = {"unknown": 0, "clean": 1, "suspicious": 2, "malicious": 3}
 
-# Detection names that, on their own, make a sample malicious (not just suspicious).
-STRONG = {
-    "Process injection capability": 0, "Remote thread injection": 0, "Code implanted in memory": 0,
-    "LSASS memory access": 0, "Persistence via Run key": 0, "Persistence via scheduled task": 0,
-    "Persistence via service": 0, "Recovery inhibition": 0, "Security tool tampering": 0,
-    "Mass file activity": 0, "Mass file deletion": 0, "Ransom_Note_Indicators": 0,
+# Behaviour decisive on its own: legitimate software essentially never does it.
+DECISIVE = {
+    "Process injection capability", "Remote thread injection", "Code implanted in memory",
+    "LSASS memory access", "Recovery inhibition", "Security tool tampering",
+    "Mass file activity", "Mass file deletion", "Ransom_Note_Indicators",
 }
+# Autostart persistence: typical of malware, but installers and updaters add Run keys, tasks and
+# services too. Alone it makes a sample suspicious; with corroboration (decisive behaviour, intel,
+# a named family, or high static risk) it makes it malicious.
+PERSISTENCE = {"Persistence via Run key", "Persistence via scheduled task", "Persistence via service"}
 
 # Strings in a YARA pack rule name that name a family rather than a generic trait.
 _GENERIC_RULE = re.compile(r"(?i)^(SUSP|SUSPICIOUS|INDICATOR|PE_|Windows_|Generic|Anomaly|Hunting|"
@@ -90,11 +93,13 @@ def assess(static=None, detections=None, intel=None, enrich=None, groups=None, d
     # --- behaviour / signature detections
     dets = detections.get("detections") or []
     sev_counts = {s: 0 for s in ("info", "low", "medium", "high")}
-    strong_hit = []
+    strong_hit, persist_hit = [], []
     for d in dets:
         sev_counts[d.get("severity", "info")] = sev_counts.get(d.get("severity", "info"), 0) + 1
-        if d["name"] in STRONG or any(d["name"].startswith(p) for p in ("Sigma: ",)) and d.get("severity") == "high":
+        if d["name"] in DECISIVE or (d["name"].startswith("Sigma: ") and d.get("severity") == "high"):
             strong_hit.append(d["name"])
+        elif d["name"] in PERSISTENCE:
+            persist_hit.append(d["name"])
     score += min(30, sev_counts["high"] * 12 + sev_counts["medium"] * 5 + sev_counts["low"] * 1)
     if sev_counts["high"]:
         reasons.append(f"{sev_counts['high']} high-severity detection(s)")
@@ -134,10 +139,16 @@ def assess(static=None, detections=None, intel=None, enrich=None, groups=None, d
 
     # --- verdict decision
     executed = bool((dynamic or {}).get("detonated"))
-    if intel_verdict == "malicious" and hits or strong_hit or (families and (sources & {"intel", "behaviour"})) or score >= 70:
+    intel_malicious = intel_verdict == "malicious" and bool(hits)
+    corroborated = bool(strong_hit) or intel_malicious or bool(families) or risk >= 50
+    if (intel_malicious or strong_hit or (families and (sources & {"intel", "behaviour"}))
+            or (persist_hit and corroborated) or score >= 70):
         verdict = "malicious"
-    elif score >= 35 or intel_verdict == "suspicious" or sev_counts["medium"]:
+    elif persist_hit or score >= 35 or intel_verdict == "suspicious" or sev_counts["medium"]:
         verdict = "suspicious"
+        if persist_hit and not corroborated:
+            reasons.append("autostart persistence without other strong evidence "
+                           "(installers do this too; detonate longer or check intel)")
     elif intel_verdict == "clean" and hits and not dets and score < 15:
         verdict = "clean"
     else:
@@ -158,7 +169,7 @@ def assess(static=None, detections=None, intel=None, enrich=None, groups=None, d
     if verdict == "malicious":
         score = max(score, 72)
     elif verdict == "suspicious":
-        score = max(score, 38)
+        score = max(score, 50 if persist_hit else 38)
     elif verdict == "clean":
         score = min(score, 10)
 
