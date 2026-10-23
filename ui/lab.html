@@ -469,7 +469,7 @@ function ask({ title, body, ok = "Confirm", danger = false, cancel = "Cancel" })
   return new Promise((resolve) => {
     const d = $("dlg");
     $("dlg-title").textContent = title; $("dlg-body").innerHTML = body;
-    $("dlg-ok").textContent = ok; $("dlg-ok").className = danger ? "danger" : "primary";
+    $("dlg-ok").textContent = ok; $("dlg-ok").className = danger ? "danger" : "primary"; $("dlg-ok").disabled = false;
     $("dlg-cancel").textContent = cancel;
     const done = (v) => { d.close(); resolve(v); };
     $("dlg-ok").onclick = () => done(true); $("dlg-cancel").onclick = () => done(false);
@@ -529,8 +529,31 @@ async function netAsk(net) {
     body: `<p>The sample will be able to reach the internet, including real command-and-control servers, and those servers will see your public IP.</p><p>${net === "full" ? "<b>Your local network is not blocked.</b>" : "A firewall rule inside the VM blocks your local network and this PC, and the run is refused if it can't be applied. The sample runs as administrator inside the VM, so a determined sample could remove that rule."}</p>${guardNote()}` });
 }
 
+// One-time safety warning before a sample first runs in the sandbox. The acknowledgement is kept
+// in the lab folder (LAB.detonation_ack), so it isn't shown again after a restart.
+async function detonationWarning() {
+  if (LAB && LAB.detonation_ack) return true;
+  const answer = ask({ title: "Before you run malware", ok: "I understand, continue", danger: true,
+    body: `<p>Detonating runs the sample for real inside Windows Sandbox, a disposable VM that is wiped when the run ends. MalLab never runs it on this PC.</p>
+      <ul>
+        <li><b>No sandbox is perfect.</b> VM escapes are rare but have happened. Keep Windows updated, and use a separate machine for targeted or nation-state samples.</li>
+        <li><b>Keep networking Off or Simulated</b> unless you need real traffic. With Internet access the sample can reach real servers and they see your public IP.</li>
+        <li><b>Never open files from the quarantine folder, or exported dropped files and memory dumps, on this PC.</b> They are live malware, and the Defender exclusion stops Defender from catching them.</li>
+        <li>Only analyse samples you're allowed to handle.</li>
+      </ul>
+      <label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="dw-ok"> I've read this and accept the risk</label>` });
+  $("dlg-ok").disabled = true;
+  $("dw-ok").onchange = () => { $("dlg-ok").disabled = !$("dw-ok").checked; };
+  if (!await answer) return false;
+  const r = await api("/api/lab/detonation-ack", {});
+  if (r.error) { toast(r.error, true); return false; }
+  if (LAB) LAB.detonation_ack = true;
+  return true;
+}
+
 // Hardened interactive sandbox (header button + "Open in sandbox" on a sample page).
 async function openSandbox(sampleId, name) {
+  if (sampleId && !await detonationWarning()) return;
   const ok = await ask({ title: sampleId ? `Open ${name} in Windows Sandbox?` : "Open Windows Sandbox?", ok: "Open sandbox",
     body: `<p>Starts a disposable Windows Sandbox with the lab's protections: <b>networking off</b>, no GPU sharing, and clipboard, audio, video and printer disconnected from this PC.</p>
       ${sampleId ? `<p>The sample is placed read-only in <span class="mono">Desktop\\input</span>. Running it there is your call. Nothing runs on this PC.</p>` : ""}
@@ -668,6 +691,7 @@ function syncRun() {
 async function runQuick() {
   if (!Q.file || Q.running) return;
   if (OPTS.exec && !(LAB && LAB.sandbox.available)) return toast("Windows Sandbox isn't enabled. Switch off “Execute in sandbox” for static analysis.", true);
+  if (OPTS.exec && !await detonationWarning()) return;
   if (OPTS.exec && OPTS.net !== "off" && !await netAsk(OPTS.net)) return;
   Object.assign(Q, { running: true, status: OPTS.exec ? "Detonating" : "Analyzing", log: [], started: Date.now(), done: null });
   syncRun(); renderProgress();
@@ -1237,6 +1261,7 @@ function beacons(d) {
   return `<div class="sublabel">Contact pattern</div><div class="tbl"><table><thead><tr><th>Host</th><th>Contacts</th><th>Pattern</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 async function detonate(sid, timeout, net) {
+  if (!await detonationWarning()) return;
   if (net !== "off" && !await netAsk(net)) return;
   const r = await api(`/api/lab/sample/${sid}/detonate`, { timeout, ...netBody(net), do_detonate: true });
   if (r.error) return toast(r.error, true);

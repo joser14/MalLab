@@ -74,3 +74,22 @@ def test_host_report_renders_through_signatures():
     assert "Persistence via Run key" in names
     # Evasion flag never fires on host observation (nothing was executed by MalLab).
     assert "Sandbox evasion suspected" not in names
+
+
+def test_detonation_warning_is_acknowledged_once_and_persists(tmp_path):
+    # The one-time "before you run malware" warning: unacknowledged on a fresh lab, remembered in
+    # the lab folder once accepted, so a restart (a new MalLab on the same folder) doesn't re-ask.
+    c = TestClient(server.LocalOnly(server.build_app(MalLab(tmp_path), server.Hub())),
+                   base_url="http://127.0.0.1:7860", client=("127.0.0.1", 5000))
+    assert c.get("/api/lab/state").json()["detonation_ack"] is False
+    assert c.post("/api/lab/detonation-ack", json={}).json()["acknowledged"] is True
+    assert c.get("/api/lab/state").json()["detonation_ack"] is True
+    assert MalLab(tmp_path).detonation_acknowledged()
+
+
+def test_ui_shows_the_warning_before_every_way_of_running_a_sample():
+    html = (Path(__file__).resolve().parent.parent / "ui" / "lab.html").read_text(encoding="utf-8")
+    assert "async function detonationWarning()" in html
+    for fn in ("async function detonate(", "async function runQuick(", "async function openSandbox("):
+        body = html.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert "detonationWarning()" in body, fn

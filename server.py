@@ -379,6 +379,9 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         b = await _body(request)
         return await _call(lab.set_blu_mode, bool(b.get("arm")), str(b.get("confirm", "")))
 
+    async def detonation_ack(request):
+        return await _call(lab.acknowledge_detonation)
+
     async def host_observe(request):
         b = await _body(request)
         sid = request.path_params["sid"]
@@ -555,6 +558,7 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/sample/{sid}/related", related),
         Route("/api/lab/sandbox/open", sandbox_open, methods=["POST"]),
         Route("/api/lab/blu/arm", blu_arm, methods=["POST"]),
+        Route("/api/lab/detonation-ack", detonation_ack, methods=["POST"]),
         Route("/api/lab/sample/{sid}/observe", host_observe, methods=["POST"]),
         Route("/api/lab/sample/{sid}/yara", yara_generate),
         Route("/api/lab/sample/{sid}/actors", actor_suggest),

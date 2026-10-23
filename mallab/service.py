@@ -238,6 +238,18 @@ class MalLab:
             self._emit(type="lab_log", text="BLU MODE disarmed.")
         return self.blu_status()
 
+    # ---- detonation safety warning ---------------------------------------
+    # Shown once before the first detonation (or sample opened in the sandbox); the analyst's
+    # acknowledgement is kept in the lab folder so it survives restarts and reinstalls.
+
+    def detonation_acknowledged(self) -> bool:
+        return (self.lab_root / "detonation-warning.ack").exists()
+
+    def acknowledge_detonation(self) -> dict:
+        self.lab_root.mkdir(parents=True, exist_ok=True)
+        (self.lab_root / "detonation-warning.ack").write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+        return {"acknowledged": True}
+
     def host_observe(self, sample_id: str, *, seconds: int = 60, confirm: str = "") -> dict:
         """Record this host for a window and attach the behaviour report to a sample. Executes
         nothing: the analyst runs the sample themselves, outside MalLab. Gated and confirmed."""
@@ -1013,6 +1025,7 @@ class MalLab:
             "sysmon": self.sysmon_status(),
             "capa": bool(static.find_capa(self.tools_dir)),
             "blu": self.blu_status(),
+            "detonation_ack": self.detonation_acknowledged(),
             "misp": misp.status(),
             "tools": self.tools_status(),
             "setup_pending": self.setup_pending(),
