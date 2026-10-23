@@ -128,7 +128,8 @@ input.mono-in { font-family: var(--mono); font-size: 12.5px; }
 
 /* layout */
 main { max-width: 1180px; margin: 0 auto; padding: 36px 24px 90px; animation: fade .18s ease; }
-@keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+/* Starts part-visible, so a paused or interrupted animation never leaves the page washed out. */
+@keyframes fade { from { opacity: .45; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .page-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
 .page-head > :first-child { flex: 1; min-width: 240px; }
 h1 { font: 700 32px/1.15 var(--head); letter-spacing: -.025em; }
@@ -190,8 +191,17 @@ tr.link:hover { background: var(--hover); box-shadow: inset 3px 0 0 var(--violet
 td.chev { color: var(--faint); text-align: right; width: 32px; font-family: var(--mono); }
 tr.link:hover td.chev { color: var(--violet); }
 .tbl { border: 1.5px solid var(--line2); border-radius: var(--r-sm); overflow: auto; }
-.empty { text-align: center; padding: 46px 20px; color: var(--muted); }
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 .empty b { display: block; color: var(--text); font: 600 16px var(--head); margin-bottom: 4px; }
+.empty .ei { width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 11px; display: grid; place-items: center; color: var(--violet);
+  background: var(--accent-soft); border: 1.5px solid color-mix(in srgb, var(--violet) 25%, transparent); }
+.empty .ei svg { width: 20px; height: 20px; }
+.empty .ea { margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.empty.err-state b { color: var(--red); }
+.page-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 70px 20px; color: var(--muted); font-size: 13.5px; }
+.spin-box { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; }
+.offline { position: sticky; top: 64px; z-index: 9; display: flex; align-items: center; gap: 10px; justify-content: center; padding: 9px 16px;
+  font-size: 13px; color: var(--text); background: color-mix(in srgb, var(--amber) 16%, var(--surface)); border-bottom: 1.5px solid color-mix(in srgb, var(--amber) 45%, transparent); }
 .empty .btn, .empty button { margin-top: 14px; }
 
 /* risk & badges */
@@ -295,6 +305,12 @@ pre { margin: 0; background: var(--code); border: 1px solid var(--line2); border
   box-shadow: 4px 4px 0 var(--shadow); max-width: 390px; animation: fade .2s ease; display: flex; gap: 10px; align-items: baseline; }
 .toast::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--green); flex: none; transform: translateY(-1px); }
 .toast.err::before { background: var(--red); }
+.toast.err { border-color: var(--red); }
+.toast .tm { flex: 1; min-width: 0; }
+.toast .tx { height: auto; padding: 0 2px; margin-left: 4px; border: none; background: none; color: var(--muted); font: 18px/1 var(--sans); }
+.toast .tx:hover { color: var(--text); transform: none; box-shadow: none; }
+.toast.bump { animation: bump .3s ease; }
+@keyframes bump { 40% { transform: scale(1.03); } }
 dialog { border: 1.5px solid var(--ink); border-radius: 14px; background: var(--grad) top / 100% 5px no-repeat, var(--surface); color: var(--text); padding: 0;
   width: min(470px, calc(100vw - 32px)); box-shadow: 8px 8px 0 var(--shadow); }
 dialog::backdrop { background: rgba(11, 10, 30, .55); backdrop-filter: blur(3px); }
@@ -317,6 +333,7 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
 .lead { padding: 13px 15px; border: 1.5px solid var(--line2); border-radius: var(--r); display: grid; gap: 6px; background: var(--surface); }
 .lead + .lead { margin-top: 10px; }
 .top .status button.sm { margin-right: 4px; }
+.tool-row { margin-bottom: 16px; gap: 8px; }
 /* BLU MODE: blue-team host observation */
 .blu-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font: 800 10.5px var(--mono); letter-spacing: .12em;
   color: #fff; background: linear-gradient(120deg, #1455ff, #4a63ff); box-shadow: 2px 2px 0 var(--shadow-strong); }
@@ -336,9 +353,29 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
   .set { grid-template-columns: 1fr; gap: 14px; }
 }
 @media (max-width: 680px) {
-  .top-in { height: auto; padding: 12px 16px 10px; flex-wrap: wrap; gap: 10px 16px; }
-  .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  /* Header: logo + status on one row, the full nav on a second (all five items fit at 375px). */
+  .top-in { height: auto; padding: 12px 16px 6px; flex-wrap: wrap; gap: 8px 12px; }
+  .status { gap: 4px; }
+  .stat { padding: 0 7px; height: 28px; }
+  .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; justify-content: space-between; gap: 0; }
   .nav::-webkit-scrollbar { display: none; }
+  .nav a { padding: 8px 8px; font-size: 11px; letter-spacing: .05em; }
+  .nav a.on::after { left: 8px; right: 8px; }
+  .offline { position: relative; top: 0; }
+  /* Page-head actions: full-width controls in a tidy two-column grid instead of a ragged wrap. */
+  .page-head > .row { width: 100%; }
+  .page-head > .row > input { flex: 1; width: auto !important; min-width: 0; }
+  .case-actions > .row:not(.hidden) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .case-actions > .row > * { width: 100%; }
+  .case-actions #c-del { margin-left: auto; }
+  .shead > .row { width: 100%; }
+  .shead > .row > * { flex: 1 1 auto; }
+  /* Tabs: tighter, with a fade on the right edge hinting there's more to scroll. */
+  .tabs a { padding: 10px 8px; font-size: 11px; letter-spacing: .04em; }
+  .tabs { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+  #yr-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .toasts { left: 16px; right: 16px; bottom: 16px; }
+  .toast { max-width: none; }
   main { padding: 24px 16px 60px; }
   .opts, .two { grid-template-columns: 1fr; }
   .rules { grid-template-columns: 1fr; }
@@ -363,7 +400,7 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
     <a href="#/settings" data-nav="settings">Settings</a>
   </nav>
   <div class="status">
-    <button class="sm" id="open-sb" title="Open a hardened Windows Sandbox: networking off, no GPU, clipboard/audio/video/printer disconnected">Open Sandbox</button>
+    <button class="sm" id="open-sb" title="Open a hardened Windows Sandbox: networking off, no GPU, clipboard/audio/video/printer disconnected"><span class="hide-sm">Open&nbsp;</span>Sandbox</button>
     <a class="stat" href="#/settings" id="st-sb" title="Windows Sandbox"><span class="dot"></span><span class="lbl">Sandbox</span></a>
     <a class="stat" href="#/settings" id="st-def" title="Microsoft Defender"><span class="dot"></span><span class="lbl">Defender</span></a>
     <a class="stat" href="#/settings" id="st-ti" title="Threat-intel sources"><span class="dot"></span><span class="lbl">Intel</span></a>
@@ -371,6 +408,7 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
   </div>
 </div></header>
 
+<div id="offline" class="offline hidden" role="alert"><span class="spin"></span><span><b>Can't reach MalLab's local service.</b> Reconnecting… If this doesn't clear, reopen MalLab.</span></div>
 <main id="main"></main>
 
 <dialog id="dlg"><div class="dbody"><h2 id="dlg-title"></h2><div class="dtext" id="dlg-body"></div></div>
@@ -382,9 +420,26 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
 const $ = (id) => document.getElementById(id);
 const main = $("main");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Every API call goes through here: a network failure flips the connection banner on, any
+// answer from the server flips it off again, and errors come back as {error} with plain wording.
 const api = (p, body) => fetch(p, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-  .then(async (r) => { try { return await r.json(); } catch { return { error: `Server error (${r.status})` }; } })
-  .catch((e) => ({ error: "Can't reach the lab service: " + e.message }));
+  .then(async (r) => { setOffline(false); try { return await r.json(); } catch { return { error: `MalLab's service returned an unexpected response (HTTP ${r.status}).` }; } })
+  .catch(() => { setOffline(true); return { error: "MalLab's local service isn't responding. It may have closed; reopen MalLab and try again.", offline: true }; });
+function setOffline(off) {
+  const b = document.getElementById("offline"); if (!b || b.classList.contains("hidden") === !off) return;
+  b.classList.toggle("hidden", !off);
+}
+// Show the page spinner only if loading takes long enough to notice (no flash on fast pages).
+async function withLoading(promise, text) {
+  const t = setTimeout(() => loading(text), 150);
+  try { return await promise; } finally { clearTimeout(t); }
+}
+const spinLine = (text = "Loading…") => `<div class="spin-box"><span class="spin"></span><span>${esc(text)}</span></div>`;
+const spinBox = (text = "Loading…") => `<div class="card spin-box"><span class="spin"></span><span>${esc(text)}</span></div>`;
+const ICON_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`;
+// One empty-state shape everywhere: icon, title, one line of guidance, optional action.
+const emptyState = (title, body, action = "") => `<div class="empty"><div class="ei">${ICON_EMPTY}</div><b>${esc(title)}</b><div>${body}</div>${action ? `<div class="ea">${action}</div>` : ""}</div>`;
+const errorState = (msg, retry = true) => `<div class="empty err-state"><b>Couldn't load this</b><div>${esc(msg)}</div>${retry ? `<div class="ea"><button onclick="route()">Try again</button></div>` : ""}</div>`;
 const fmtDate = (t) => t ? new Date(t * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
 const fmtSize = (n) => n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(2)} MB`;
 const riskClass = (r) => r >= 60 ? "hi" : r >= 25 ? "mid" : "lo";
@@ -398,8 +453,17 @@ const store = { get(k, d) { try { const v = localStorage.getItem("mallab." + k);
 const ICON_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>`;
 
 function toast(text, err) {
-  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.textContent = text;
-  $("toasts").appendChild(t); setTimeout(() => t.remove(), err ? 6000 : 2800);
+  const box = $("toasts");
+  // The same message twice in a row: bump the existing one instead of stacking duplicates.
+  const dup = [...box.children].find((x) => x.dataset.text === text);
+  if (dup) { dup.classList.remove("bump"); void dup.offsetWidth; dup.classList.add("bump"); return; }
+  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.dataset.text = text;
+  t.setAttribute("role", err ? "alert" : "status");
+  const msg = document.createElement("span"); msg.className = "tm"; msg.textContent = text; t.appendChild(msg);
+  const x = document.createElement("button"); x.className = "tx"; x.setAttribute("aria-label", "Dismiss"); x.textContent = "×";
+  x.onclick = () => t.remove(); t.appendChild(x);
+  box.appendChild(t);
+  setTimeout(() => t.remove(), err ? 9000 : 3200);   // errors stay longer; both can be dismissed
 }
 function ask({ title, body, ok = "Confirm", danger = false, cancel = "Cancel" }) {
   return new Promise((resolve) => {
@@ -510,7 +574,7 @@ let SAMPLE = null;      // data for the open sample page
 
 async function refreshState() {
   const s = await api("/api/lab/state");
-  if (s.error) return;
+  if (s.error) return s;            // callers that render from LAB check this (keep the last good LAB)
   LAB = s;
   const sb = LAB.sandbox || {};
   setStat("st-sb", sb.busy ? "busy" : sb.available ? "ok" : "bad", sb.busy ? "Sandbox busy" : sb.available ? "Sandbox" : "Sandbox off");
@@ -546,7 +610,7 @@ function page(html, keepScroll) {
   main.innerHTML = html;
   if (!keepScroll) { main.style.animation = "none"; void main.offsetWidth; main.style.animation = ""; window.scrollTo(0, 0); }
 }
-const loading = () => page(`<div class="empty"><span class="spin"></span></div>`);
+const loading = (text = "Loading…") => page(`<div class="page-loading"><span class="spin"></span><span>${esc(text)}</span></div>`);
 function wireRows() { main.querySelectorAll("tr[data-href]").forEach((tr) => tr.onclick = () => location.hash = tr.dataset.href); }
 
 // ============================================================ Analyze (home)
@@ -577,7 +641,7 @@ function viewHome() {
   <div id="q-progress"></div>
   <div class="section-title">Recent cases ${recent.length ? `<a href="#/cases">All cases →</a>` : ""}</div>
   ${recent.length ? `<div class="card flush"><table><tbody>${recent.map((c) => `<tr class="link" data-href="#/case/${c.id}"><td><b>${esc(c.name)}</b></td><td class="small">${plural(c.sample_count, "sample")}</td><td class="small hide-sm">${fmtDate(c.created)}</td><td class="chev">›</td></tr>`).join("")}</tbody></table></div>`
-    : `<div class="card"><div class="empty" style="padding:20px"><b>No cases yet</b>Files you analyze here are kept in a “Quick Detonate” case.</div></div>`}`);
+    : `<div class="card">${emptyState("No cases yet", "Files you analyze here are kept in a “Quick Detonate” case.")}</div>`}`);
   wireRows();
   $("o-pw").value = OPTS.pw;
   setupDrop($("drop"), $("file"), ([f]) => { Q.file = f; Q.done = null; Q.log = []; $("drop").classList.add("has"); $("drop-file").textContent = `${f.name} · ${fmtSize(f.size)}`; syncRun(); renderProgress(); });
@@ -643,15 +707,16 @@ function quickDone(e) {
 // ============================================================ Cases
 async function viewCases() {
   setNav("cases"); cur = { view: "cases" };
-  await refreshState();
+  const st = await withLoading(refreshState(), "Loading cases…");
   if (cur.view !== "cases") return;
+  if (st && st.error && !LAB) return page(errorState(st.error));   // never claim "no cases" when we couldn't ask
   const cases = ((LAB && LAB.cases) || []).slice().sort((a, b) => b.created - a.created);
   page(`
   <div class="page-head"><div><h1>Cases</h1><p class="sub">A case groups the samples, detonation runs and notes for one investigation.</p></div>
     <div class="row"><input id="nc-name" placeholder="New case name" style="width:240px" aria-label="New case name"><button class="primary" id="nc-create">Create case</button></div></div>
   <div class="card flush">${cases.length ? `<table><thead><tr><th>Name</th><th>Samples</th><th class="hide-sm">Created</th><th></th></tr></thead><tbody>
     ${cases.map((c) => `<tr class="link" data-href="#/case/${c.id}"><td><b>${esc(c.name)}</b></td><td>${c.sample_count}</td><td class="small hide-sm">${fmtDate(c.created)}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
-    : `<div class="empty"><b>No cases yet</b>Create one above, or analyze a file on the Analyze page.</div>`}</div>`);
+    : emptyState("No cases yet", "Create one above to group an investigation, or analyze a single file.", `<a class="btn" href="#/">Analyze a file</a>`)}</div>`);
   wireRows();
   const create = async () => {
     const name = $("nc-name").value.trim(); if (!name) return $("nc-name").focus();
@@ -668,19 +733,22 @@ async function viewCase(cid) {
   setNav("cases"); cur = { view: "case", cid }; loading();
   const d = await api("/api/lab/case/" + cid);
   if (cur.view !== "case" || cur.cid !== cid) return;
-  if (d.error || !d.case) return page(`<div class="empty"><b>Case not found</b><a class="btn" href="#/cases">Back to cases</a></div>`);
+  if (d.offline) return page(errorState(d.error));
+  if (d.error || !d.case) return page(emptyState("Case not found", "It may have been deleted.", `<a class="btn" href="#/cases">Back to cases</a>`));
   const c = d.case, samples = d.samples.slice().sort((a, b) => (b.risk || 0) - (a.risk || 0));
   page(`
   <nav class="crumbs"><a href="#/cases">Cases</a><span>/</span><b>${esc(c.name)}</b></nav>
   <div class="page-head"><div><h1>${esc(c.name)}</h1><p class="sub">${plural(samples.length, "sample")} · created ${fmtDate(c.created)}</p></div>
-    <div class="row"><button id="c-iocs" ${samples.length ? "" : "disabled"}>Copy IOCs</button>
-      <select id="c-export" aria-label="Export IOCs" ${samples.length ? "" : "disabled"}><option value="">Export IOCs…</option><option value="csv">CSV</option><option value="stix">STIX 2.1 (MISP / OpenCTI)</option><option value="txt">Defanged text</option></select>
-      <button id="c-compare" ${samples.length > 1 ? "" : "disabled"}>Compare</button>
-      <select id="c-report" aria-label="Report" ${samples.length ? "" : "disabled"}><option value="">Report…</option><option value="html-view">HTML — view</option><option value="html">HTML — download</option><option value="md">Markdown</option></select><button class="ghost red" id="c-del">Delete</button></div></div>
-  <div class="row" style="margin-bottom:16px;gap:8px"><button class="sm" id="c-attck" ${samples.length ? "" : "disabled"}>ATT&amp;CK matrix</button>
-    <button class="sm" id="c-timeline" ${samples.length ? "" : "disabled"}>Timeline</button>
-    <button class="sm" id="c-enrich" ${samples.length ? "" : "disabled"} title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button>
-    ${LAB && LAB.misp && LAB.misp.configured ? `<button class="sm" id="c-misp" ${samples.length ? "" : "disabled"} title="Push this case's IOCs to your MISP instance">Push to MISP</button>` : ""}</div>
+    <div class="row case-actions">
+      <div class="row ${samples.length ? "" : "hidden"}"><button id="c-iocs">Copy IOCs</button>
+        <select id="c-export" aria-label="Export IOCs"><option value="">Export IOCs…</option><option value="csv">CSV</option><option value="stix">STIX 2.1 (MISP / OpenCTI)</option><option value="txt">Defanged text</option></select>
+        <button id="c-compare" ${samples.length > 1 ? "" : "disabled"} title="${samples.length > 1 ? "What the samples have in common" : "Needs two or more samples"}">Compare</button>
+        <select id="c-report" aria-label="Report"><option value="">Report…</option><option value="html-view">HTML — view</option><option value="html">HTML — download</option><option value="md">Markdown</option></select></div>
+      <button class="ghost red" id="c-del">Delete</button></div></div>
+  <div class="row tool-row ${samples.length ? "" : "hidden"}"><button class="sm" id="c-attck">ATT&amp;CK matrix</button>
+    <button class="sm" id="c-timeline">Timeline</button>
+    <button class="sm" id="c-enrich" title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button>
+    ${LAB && LAB.misp && LAB.misp.configured ? `<button class="sm" id="c-misp" title="Push this case's IOCs to your MISP instance">Push to MISP</button>` : ""}</div>
   <div id="c-compare-box"></div>
   <div class="split">
     <div class="stack">
@@ -691,10 +759,10 @@ async function viewCase(cid) {
         ${samples.map((s) => `<tr class="link" data-href="#/case/${cid}/sample/${s.id}"><td>${s.verdict ? verdictBadge(s.verdict.verdict) : riskBadge(s.risk)}</td>
           <td><div class="mono" style="font-size:13px;color:var(--text)">${esc(s.filename)}</div><div class="small">${esc(s.source || "")}</div></td>
           <td class="small hide-sm">${s.verdict && s.verdict.family ? esc(s.verdict.family) : esc(s.file_type || "")}</td><td class="hide-sm">${s.run_count || 0}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
-        : `<div class="empty"><b>No samples yet</b>Use “Add samples” to upload a file or archive.</div>`}</div>
+        : emptyState("No samples yet", "Add a file or a .zip / .7z archive to start the investigation.", `<button class="primary" id="c-empty-add">Add a sample</button>`)}</div>
       <div class="card"><h3>Notes</h3><textarea id="c-notes" style="width:100%;min-height:110px" placeholder="Findings, hypotheses, next steps…" aria-label="Case notes">${esc(c.notes || "")}</textarea>
         <div class="row end" style="margin-top:10px"><span class="small" id="c-notes-st"></span><button id="c-notes-save">Save notes</button></div></div>
-      <div class="card"><h3>Threat groups</h3><div id="c-groups"><span class="spin"></span></div></div>
+      <div class="card"><h3>Threat groups</h3><div id="c-groups">${spinLine("Loading groups…")}</div></div>
     </div>
     <aside class="card">
       <h3>Add samples</h3>
@@ -714,6 +782,7 @@ async function viewCase(cid) {
     </aside>
   </div>`);
   wireRows();
+  if ($("c-empty-add")) $("c-empty-add").onclick = () => $("c-file").click();   // same picker as the Add samples panel
   const opts = () => ({ unpack: $("c-unpack").checked, password: $("c-pw").value.trim() });
   $("c-unpack").onchange = () => { OPTS.unpack = $("c-unpack").checked; saveOpts(); };
   const added = (r, name) => r.archive ? toast(`Unpacked ${r.archive.name}: ${plural(r.archive.count, "file")} added`) : toast(`${name} added`);
@@ -780,7 +849,7 @@ async function viewCase(cid) {
     try { await navigator.clipboard.writeText(lines.join("\n")); toast("IOCs copied to clipboard"); } catch { toast("Clipboard not available", true); }
   };
   $("c-compare").onclick = async () => {
-    const box = $("c-compare-box"); box.innerHTML = `<div class="card" style="margin-bottom:20px"><span class="spin"></span></div>`;
+    const box = $("c-compare-box"); box.innerHTML = `<div style="margin-bottom:20px">${spinBox("Comparing samples…")}</div>`;
     const r = await api(`/api/lab/case/${cid}/compare`);
     if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
     const ov = Object.entries(r.ioc_overlap || {});
@@ -796,12 +865,12 @@ async function viewCase(cid) {
     $("pn-x").onclick = () => $("c-compare-box").innerHTML = "";
   };
   $("c-attck").onclick = async () => {
-    panel("ATT&amp;CK techniques across the case", `<span class="spin"></span>`);
+    panel("ATT&amp;CK techniques across the case", spinLine("Building the matrix…"));
     const r = await api(`/api/lab/case/${cid}/attck`); if (r.error) return toast(r.error, true);
     panel("ATT&amp;CK techniques across the case", matrixHtml(r.matrix) + `<p class="small" style="margin-top:10px">Hover a technique to see which detections fired it.</p>`);
   };
   $("c-timeline").onclick = async () => {
-    panel("Timeline", `<span class="spin"></span>`);
+    panel("Timeline", spinLine("Building the timeline…"));
     const r = await api(`/api/lab/case/${cid}/timeline`); if (r.error) return toast(r.error, true);
     panel(`Timeline <span class="badge">${r.events.length}</span>`, r.events.length ? `<div class="tl">${r.events.map((e) =>
       `<div><span class="small">${e.t ? new Date(e.t * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "medium" }) : ""}</span><span class="kind">${esc(e.kind)}</span><span class="break"><span class="small mono">${esc(e.sample)}</span> ${esc(e.text)}</span></div>`).join("")}</div>`
@@ -826,7 +895,7 @@ async function viewCase(cid) {
       if (!await ask({ title: "Look up this case's indicators online?", ok: "Look up",
         body: `<p>The case's public IPs, domains and URLs are sent to free intel services (OTX, GreyNoise, Shodan InternetDB, RDAP, abuse.ch). Samples are never uploaded.</p><p>Looking up an indicator tells those services you're interested in it, which a careful adversary might notice.</p>` })) return;
     }
-    panel("IOC enrichment", `<div class="row"><span class="spin"></span> Querying sources…</div>`);
+    panel("IOC enrichment", spinLine("Querying sources…"));
     const r = await api(`/api/lab/case/${cid}/enrich`, { refresh: !!refresh });
     if (r.error) return panel("IOC enrichment", `<div class="none" style="color:var(--red)">${esc(r.error)}</div>`);
     $("c-compare-box").dataset.enriched = "1"; showEnrich(r);
@@ -851,7 +920,7 @@ async function loadCaseGroups(cid, samples) {
 }
 
 // ============================================================ Sample page
-const TABS = [["overview", "Overview"], ["static", "Static"], ["behavior", "Behavior"], ["intel", "Threat intel"], ["investigate", "Investigate"]];
+const TABS = [["overview", "Overview"], ["static", "Static"], ["behavior", "Behavior"], ["intel", '<span class="hide-sm">Threat </span>Intel'], ["investigate", "Investigate"]];
 async function viewSample(cid, sid, tab, force) {
   setNav("cases");
   const same = SAMPLE && SAMPLE.s.id === sid && !force;
@@ -862,7 +931,7 @@ async function viewSample(cid, sid, tab, force) {
       api(`/api/lab/sample/${sid}/detections`), api(`/api/lab/sample/${sid}/verdict`)]);
     if (cur.view !== "sample" || cur.sid !== sid) return;
     const s = d.samples && d.samples.find((x) => x.id === sid);
-    if (!s) return page(`<div class="empty"><b>Sample not found</b><a class="btn" href="#/case/${cid}">Back to case</a></div>`);
+    if (!s) return page(d.offline ? errorState(d.error) : emptyState("Sample not found", "It may have been deleted with its case.", `<a class="btn" href="#/case/${cid}">Back to case</a>`));
     SAMPLE = { c: d.case, s, st: st && !st.error ? st : null, det: det && !det.error ? det : {},
       verdict: ver && !ver.error ? ver : null, run: force && SAMPLE ? SAMPLE.run : null };
   }
@@ -890,8 +959,8 @@ function renderSample(keepScroll) {
 async function tabInvestigate() {
   const { s } = SAMPLE, sid = s.id;
   $("tab").innerHTML = `<div class="stack">
-    <div class="card"><h3>Possible threat groups</h3><div id="iv-actors"><span class="spin"></span></div></div>
-    <div class="card"><h3>Related samples in the lab</h3><div id="iv-related"><span class="spin"></span></div></div>
+    <div class="card"><h3>Possible threat groups</h3><div id="iv-actors">${spinLine("Looking for leads…")}</div></div>
+    <div class="card"><h3>Related samples in the lab</h3><div id="iv-related">${spinLine("Comparing with the lab…")}</div></div>
     <div class="card"><div class="row"><h3 class="grow" style="margin:0">Hunting rule draft</h3><button class="sm" id="iv-yara">Generate YARA rule</button></div><div id="iv-yara-box"></div></div></div>`;
   $("iv-yara").onclick = async () => {
     const r = await api(`/api/lab/sample/${sid}/yara`); if (r.error) return toast(r.error, true);
@@ -1011,7 +1080,7 @@ function tabBehavior() {
       <button id="blu-go" ${DETONATING[sid] ? "disabled" : ""}>${DETONATING[sid] ? `<span class="spin"></span> Observing…` : "Observe host"}</button></div></div>` : ""}
     <div class="card flush"><div class="row" style="padding:16px 18px 12px"><h3 class="grow" style="margin:0">Runs</h3>${withReport.length >= 2 ? `<button class="sm" id="d-diff">Compare last two</button>` : ""}</div>
       ${runs.length ? `<table><thead><tr><th>Started</th><th>Status</th><th>Verdict</th><th></th></tr></thead><tbody>${runs.map((r) => `<tr class="${r.report ? "link" : ""}" data-run="${r.report ? r.id : ""}"><td class="small">${fmtDate(r.started)}</td><td><span class="badge">${esc(cap(r.status))}</span></td><td>${esc(r.verdict || "")}</td><td class="chev">${r.report ? "›" : ""}</td></tr>`).join("")}</tbody></table>`
-        : `<div class="none" style="padding:0 18px 18px">No runs yet.</div>`}</div>
+        : emptyState("No runs yet", sb.available ? "Detonate the sample above to see what it does." : "Windows Sandbox is off on this PC, so there's nothing to run in yet.")}</div>
     <div id="d-diffbox"></div><div id="d-run"></div></div>`;
   let net = OPTS.net;
   wireSeg("d-net", (v) => net = v);
@@ -1023,7 +1092,7 @@ function tabBehavior() {
 }
 async function showRun(sid, rid) {
   SAMPLE.run = rid;
-  const box = $("d-run"); box.innerHTML = `<div class="card"><span class="spin"></span></div>`;
+  const box = $("d-run"); box.innerHTML = spinBox("Loading run…");
   const d = await api(`/api/lab/sample/${sid}/dynamic/${rid}`);
   if (!$("d-run") || cur.sid !== sid) return;
   if (d.error) { box.innerHTML = ""; return toast(d.error, true); }
@@ -1189,7 +1258,7 @@ async function observeHost(sid, seconds) {
   if (cur.sid === sid) renderSample(true);
 }
 async function diffRuns(sid, runs) {
-  const [b, a] = runs, box = $("d-diffbox"); box.innerHTML = `<div class="card"><span class="spin"></span></div>`;
+  const [b, a] = runs, box = $("d-diffbox"); box.innerHTML = spinBox("Comparing runs…");
   const r = await api(`/api/lab/sample/${sid}/diff`, { run_a: a.id, run_b: b.id });
   if (r.error) { box.innerHTML = ""; return toast(r.error, true); }
   const blk = (label, g) => `<div class="sublabel">${label}</div>` + (g.only_b.length || g.only_a.length
@@ -1203,7 +1272,7 @@ async function diffRuns(sid, runs) {
 const fmtSeen = (v) => !v ? "" : typeof v === "number" ? new Date(v * 1000).toLocaleDateString() : String(v).slice(0, 10);
 function tabIntel() {
   const sid = SAMPLE.s.id, r = INTEL[sid], ti = (LAB && LAB.intel) || [], on = ti.filter((p) => p.configured).length;
-  if (r === "pending") { $("tab").innerHTML = `<div class="card"><div class="row"><span class="spin"></span> Checking ${plural(on, "source")}…</div></div>`; return; }
+  if (r === "pending") { $("tab").innerHTML = spinBox(`Checking ${plural(on, "source")}…`); return; }
   if (!r) {
     $("tab").innerHTML = `<div class="card"><div class="empty"><b>Check this hash against threat-intel sources</b>
       Only the SHA-256 is sent. The file itself is never uploaded.<br>${on} of ${ti.length} sources are ready${on < ti.length ? ` · <a href="#/settings">Add API keys</a>` : ""}
@@ -1232,13 +1301,14 @@ async function runIntel(sid, refresh) {
 let ACT_IMPORTING = false, ACT_Q = "";
 async function viewActors() {
   setNav("actors"); cur = { view: "actors" };
-  const r = await api("/api/lab/actors"); if (cur.view !== "actors") return;
+  const r = await withLoading(api("/api/lab/actors"), "Loading threat groups…"); if (cur.view !== "actors") return;
+  if (r.error) return page(errorState(r.error));
   const all = r.actors || [];
   page(`
   <div class="page-head"><div><h1>Threat groups</h1><p class="sub">Track the groups behind your cases: aliases, known malware, techniques, and every sample and case you've linked to them.</p></div>
     <div class="row"><button id="ac-import" ${ACT_IMPORTING ? "disabled" : ""} title="MITRE ATT&CK groups, MISP Galaxy threat actors, Malpedia family attributions">${ACT_IMPORTING ? `<span class="spin"></span> Importing…` : all.length ? "Update from public sources" : "Import public group data"}</button><button class="primary" id="ac-new">New group</button></div></div>
   <div id="ac-form"></div>
-  <div class="card flush"><div style="padding:14px 16px"><input id="ac-q" placeholder="Search name, alias, malware family, country, technique…" style="width:100%" value="${esc(ACT_Q)}" aria-label="Search groups"></div>
+  <div class="card flush"><div style="padding:14px 16px"><input id="ac-q" placeholder="Search groups, aliases, malware, techniques…" style="width:100%" value="${esc(ACT_Q)}" aria-label="Search groups"></div>
     <div id="ac-list"></div></div>
   <p class="small" style="margin-top:12px">Public data: <a href="https://attack.mitre.org/groups/" target="_blank" rel="noopener">MITRE ATT&amp;CK groups</a>, <a href="https://github.com/MISP/misp-galaxy" target="_blank" rel="noopener">MISP Galaxy</a> and <a href="https://malpedia.caad.fkie.fraunhofer.de/" target="_blank" rel="noopener">Malpedia</a>. Updating keeps your own edits and notes.</p>`);
   const render = () => {
@@ -1247,7 +1317,8 @@ async function viewActors() {
     $("ac-list").innerHTML = rows.length ? `<table><thead><tr><th>Group</th><th class="hide-sm">Known malware</th><th class="hide-sm">Country</th><th>Linked</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr class="link" data-href="#/actor/${a.id}">
       <td><b>${esc(a.name)}</b>${a.mitre_id ? ` <span class="small mono">${esc(a.mitre_id)}</span>` : ""}<div class="small break">${esc((a.aliases || "").slice(0, 140))}</div></td>
       <td class="small hide-sm break">${esc((a.families || "").slice(0, 120))}</td><td class="small hide-sm">${esc(a.country || "")}</td><td>${a.link_count || ""}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
-      : `<div class="empty" style="padding:24px"><b>${all.length ? "No match" : "No groups yet"}</b>${all.length ? "" : "Import public group data, or add a group you're tracking."}</div>`;
+      : (all.length ? emptyState("No match", "Try a name, alias, malware family, country or ATT&amp;CK technique.")
+        : emptyState("No groups yet", "Import public threat-group data, or add a group you're tracking, with the buttons above."));
     wireRows();
   };
   render();
@@ -1281,7 +1352,7 @@ function actorForm(a) {
 async function viewActor(aid) {
   setNav("actors"); cur = { view: "actor", aid }; loading();
   const p = await api(`/api/lab/actors/${aid}`); if (cur.view !== "actor" || cur.aid !== aid) return;
-  if (p.error) return page(`<div class="empty"><b>Group not found</b><a class="btn" href="#/actors">Back to groups</a></div>`);
+  if (p.error) return page(p.offline ? errorState(p.error) : emptyState("Group not found", "It may have been deleted.", `<a class="btn" href="#/actors">Back to groups</a>`));
   const a = p.actor, chips = (s, cls = "") => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
   const known = chips(a.techniques), seen = new Set(p.attck_observed);
   page(`
@@ -1325,8 +1396,9 @@ let yrCur = null;
 const yrFile = (n) => /\.yara?$/i.test(n) ? n : n + ".yar";
 async function viewRules() {
   setNav("rules"); cur = { view: "rules" };
-  const r = await api("/api/lab/yara"), rules = r.rules || [];
+  const r = await withLoading(api("/api/lab/yara"), "Loading rules…"), rules = r.rules || [];
   if (cur.view !== "rules") return;
+  if (r.error) return page(errorState(r.error));
   page(`
   <div class="page-head"><div><h1>YARA rules</h1><p class="sub">Every sample is scanned with these during static triage. Requires <span class="mono">yara-python</span>.</p></div>
     <div class="row"><input id="yr-name" placeholder="new_rule_name" class="mono-in" style="width:200px" aria-label="New rule file name"><button class="primary" id="yr-new">New rule</button></div></div>
@@ -1338,7 +1410,7 @@ async function viewRules() {
       <div class="body"><div class="gutter" id="yr-gutter">1</div><textarea id="yr-text" spellcheck="false" placeholder="Pick a rule on the left, or create a new one." aria-label="Rule source"></textarea></div></div>
   </div></div>
   <div id="yr-hunt-box" style="margin-top:20px"></div>
-  <div class="card" style="margin-top:20px"><h3>Rule packs</h3><div id="yr-packs"><span class="spin"></span></div></div>`);
+  <div class="card" style="margin-top:20px"><h3>Rule packs</h3><div id="yr-packs">${spinLine("Loading packs…")}</div></div>`);
   api("/api/lab/yara/packs").then((r) => {
     if (!$("yr-packs")) return;
     const ps = r.packs || [];
@@ -1380,7 +1452,7 @@ async function retrohunt(body, btn) {
   const box = $("yr-hunt-box"); if (!box) return;
   const label = body.name || "the unsaved rule";
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spin"></span>`; }
-  box.innerHTML = `<div class="card"><div class="row"><span class="spin"></span> Retrohunting with ${esc(label)}…</div></div>`;
+  box.innerHTML = spinBox(`Retrohunting with ${label}…`);
   // Packs are hunted by file; an open rule is hunted by its current text, saved or not.
   const r = await api("/api/lab/yara/retrohunt", body.name && !body.text ? { name: body.name } : body);
   if (btn) { btn.disabled = false; btn.textContent = "Retrohunt"; }
@@ -1405,9 +1477,11 @@ async function editRule(name) {
 // ============================================================ Settings
 let DEF_BUSY = false, NG_BUSY = false;
 async function viewSettings() {
+  const arriving = cur.view !== "settings";   // re-renders after a save keep the page as is
   setNav("settings"); cur = { view: "settings" };
-  await refreshState();
-  if (cur.view !== "settings" || !LAB) return;
+  const st = await (arriving ? withLoading(refreshState(), "Loading settings…") : refreshState());
+  if (cur.view !== "settings") return;
+  if (!LAB) return page(errorState((st && st.error) || "MalLab's status couldn't be read."));
   const df = LAB.defender || {}, ti = LAB.intel || [], key = Object.fromEntries(ti.map((p) => [p.id, p]));
   const keyPill = (id) => key[id] && key[id].key_set ? `<span class="badge ok">Key set</span>` : key[id] && !key[id].key_required ? `<span class="badge">Optional</span>` : `<span class="badge">Not set</span>`;
   const defState = DEF_BUSY ? `<span class="spin"></span> Waiting for you to approve the Windows prompt…`
@@ -1633,12 +1707,15 @@ async function start() {
       : matchMedia("(prefers-color-scheme: dark)").matches;
     const t = dark ? "light" : "dark"; store.set("theme", t); applyTheme(t);
   };
-  loading();   // the first status call runs Defender / firewall checks and can take a few seconds
+  loading("Starting MalLab…");   // the very first status call runs Defender / firewall checks
   await refreshState();
   if (LAB && !LAB.sandbox.available) OPTS.exec = false;   // nothing to detonate in; default to static analysis
   route();
   const es = new EventSource("/api/events");
   es.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch {} };
+  es.onopen = () => setOffline(false);
+  // The browser retries the event stream on its own; the banner shows until a retry succeeds.
+  es.onerror = () => { if (es.readyState !== EventSource.OPEN) setOffline(true); };
   setInterval(() => { if (!LAB || !LAB.sandbox.busy) refreshState(); }, 15000);
 }
 start();

@@ -22,15 +22,15 @@ import ipaddress
 import json
 import subprocess
 import sys
-import time
 from pathlib import Path
+
+from . import swr
 
 STATE_FILE = "netguard-state.json"
 SCRIPT_FILE = "netguard-apply.ps1"
 GROUP = "MalLab host guard"
 ADAPTER = "vEthernet (Default Switch)"
 RULES = 4                       # TCP, UDP (minus DHCP/DNS), ICMPv4, ICMPv6
-_cache: dict = {}
 
 # Finds the Default Switch's host adapter. Exact name first; the description check guards against
 # an unrelated adapter that merely has "Default Switch" in its name.
@@ -66,9 +66,12 @@ $o | ConvertTo-Json -Depth 4 -Compress"""
 
 
 def _probe() -> dict:
-    """Live, non-admin view of the adapter and the guard rules. Cached for 30 s."""
-    if _cache.get("t", 0) > time.time() - 30:
-        return _cache["v"]
+    """Live, non-admin view of the adapter and the guard rules. Refreshed in the background at
+    most every 30 s, so status reads never wait on PowerShell after the first."""
+    return _PROBE_CACHE.get()
+
+
+def _read_probe() -> dict:
     v = {}
     if sys.platform == "win32":
         try:
@@ -77,8 +80,10 @@ def _probe() -> dict:
                 v = json.loads(r.stdout)
         except Exception:
             v = {}
-    _cache.update(t=time.time(), v=v)
     return v
+
+
+_PROBE_CACHE = swr.Probe(_read_probe, 30)
 
 
 def subnet(ipv4, prefix) -> str | None:
@@ -183,7 +188,7 @@ def set_enabled(tools_dir: Path, enable: bool) -> dict:
         raise RuntimeError(f"Could not start the elevated PowerShell: {err.splitlines()[0] if err else r.returncode}")
     if not state.exists() or state.stat().st_mtime <= before:
         raise RuntimeError("The elevated script didn't report back; the firewall may not have changed.")
-    _cache.clear()
+    _PROBE_CACHE.clear()
     st = _read_state(tools_dir)
     if not st.get("ok"):
         raise RuntimeError(f"Windows Firewall refused the change: {st.get('error') or 'unknown error'}")

@@ -14,12 +14,12 @@ verifies the result and writes it to a state file, which is what status() report
 import json
 import subprocess
 import sys
-import time
 from pathlib import Path
+
+from . import swr
 
 STATE_FILE = "defender-state.json"
 SCRIPT_FILE = "defender-apply.ps1"
-_cache: dict = {}
 
 
 def _ps_quote(s: str) -> str:
@@ -38,9 +38,12 @@ def _run_ps(command: str, timeout: int = 30) -> subprocess.CompletedProcess:
 
 
 def _realtime() -> dict:
-    """Defender service / real-time status (readable without admin). Cached for a minute."""
-    if _cache.get("t", 0) > time.time() - 60:
-        return _cache["v"]
+    """Defender service / real-time status (readable without admin). Refreshed in the background
+    at most once a minute, so status reads never wait on PowerShell after the first."""
+    return _REALTIME.get()
+
+
+def _read_realtime() -> dict:
     v = {"available": False, "realtime": None, "tamper": None}
     if sys.platform == "win32":
         try:
@@ -52,8 +55,10 @@ def _realtime() -> dict:
                      "realtime": j.get("RealTimeProtectionEnabled"), "tamper": j.get("IsTamperProtected")}
         except Exception:
             pass
-    _cache.update(t=time.time(), v=v)
     return v
+
+
+_REALTIME = swr.Probe(_read_realtime, 60)
 
 
 def status(lab_root: Path, tools_dir: Path) -> dict:
@@ -114,7 +119,7 @@ def set_excluded(lab_root: Path, tools_dir: Path, exclude: bool) -> dict:
         raise RuntimeError(f"Could not start the elevated PowerShell: {err.splitlines()[0] if err else r.returncode}")
     if not state.exists() or state.stat().st_mtime <= before:
         raise RuntimeError("The elevated script didn't report back; the setting may not have changed.")
-    _cache.clear()
+    _REALTIME.clear()
     out = status(lab_root, tools_dir)
     if out["last_error"] and out["excluded"] is None:
         raise RuntimeError(f"Defender refused the change: {out['last_error']}")
