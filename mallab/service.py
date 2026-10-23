@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from . import (actors, archives, defender, diffing, fakenet, hostmon, intel, ioc_intel, netguard, sandbox,
-               signatures, static, tooling, yara_rules)
+               signatures, static, tooling, verdict, yara_rules)
 from .samples import SampleSource, sha256_of
 from .store import Store
 
@@ -420,6 +420,39 @@ class MalLab:
         result = signatures.evaluate(static_rep, dyn)
         result["process_tree"] = signatures.process_tree(dyn)
         return result
+
+    def sample_verdict(self, sample_id: str) -> dict:
+        """One combined verdict/score/family for a sample, from every piece of evidence already
+        gathered (static, detections, cached intel, cached case enrichment, linked groups)."""
+        s = self.store.get_sample(sample_id)
+        if not s:
+            raise ValueError("no such sample")
+        static_rep = self.static_report(sample_id)
+        dets = self.detections(sample_id)
+        intel_summary = {}
+        cache = self.store.report_dir(s["sha256"]) / "intel.json"
+        if cache.exists():
+            try:
+                intel_summary = json.loads(cache.read_text(encoding="utf-8")).get("summary") or {}
+            except ValueError:
+                pass
+        enrich = {}
+        enr = self.intel_dir / f"case-{s['case_id']}.json"
+        if enr.exists():
+            try:
+                e = json.loads(enr.read_text(encoding="utf-8"))
+                enrich = {"families": e.get("families", []), "actors": e.get("actors", [])}
+            except ValueError:
+                pass
+        groups = [self.store.get_actor(l["actor_id"]) for l in self.store.actor_links(kind="sample", target_id=sample_id)]
+        groups += [self.store.get_actor(l["actor_id"]) for l in self.store.actor_links(kind="case", target_id=s["case_id"])]
+        latest_dyn = None
+        for run in self.store.list_runs(sample_id):
+            latest_dyn = self.dynamic_report(sample_id, run["id"])
+            if latest_dyn:
+                break
+        return verdict.assess(static=static_rep, detections=dets, intel=intel_summary,
+                              enrich=enrich, groups=[g for g in groups if g], dynamic=latest_dyn)
 
     def screenshot_path(self, sample_id: str, run_id: str) -> Path | None:
         s = self.store.get_sample(sample_id)
@@ -1102,6 +1135,15 @@ class MalLab:
         if not case:
             return None
         samples = self.store.list_samples(case_id)
+        assessments = []
         for s in samples:
             s["runs"] = self.store.list_runs(s["id"])
-        return {"case": case, "samples": samples}
+            try:
+                v = self.sample_verdict(s["id"])
+            except Exception:
+                v = None
+            if v:
+                s["verdict"] = {"verdict": v["verdict"], "score": v["score"], "family": v["family"],
+                                "confidence": v["confidence"]}
+                assessments.append(v)
+        return {"case": case, "samples": samples, "verdict": verdict.worst(assessments)}

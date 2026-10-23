@@ -290,6 +290,9 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
     async def detections(request):
         return JSONResponse(await asyncio.to_thread(lab.detections, request.path_params["sid"]))
 
+    async def verdict(request):
+        return await _call(lab.sample_verdict, request.path_params["sid"])
+
     async def annotate(request):
         b = await _body(request)
         try:
@@ -549,6 +552,7 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/quick", quick, methods=["POST"]),
         Route("/api/lab/sample/{sid}/static", static_report),
         Route("/api/lab/sample/{sid}/detections", detections),
+        Route("/api/lab/sample/{sid}/verdict", verdict),
         Route("/api/lab/sample/{sid}/intel", intel, methods=["POST"]),
         Route("/api/lab/sample/{sid}/detonate", detonate, methods=["POST"]),
         Route("/api/lab/sample/{sid}/dynamic/{rid}", dynamic),

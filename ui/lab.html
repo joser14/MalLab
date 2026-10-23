@@ -321,6 +321,7 @@ dialog .dfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 18
 .blu-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font: 800 10.5px var(--mono); letter-spacing: .12em;
   color: #fff; background: linear-gradient(120deg, #1455ff, #4a63ff); box-shadow: 2px 2px 0 var(--shadow-strong); }
 .blu-row { border-left: 4px solid var(--blue); }
+.verdict-mal { border-left: 4px solid var(--red); } .verdict-sus { border-left: 4px solid var(--amber); }
 .set h2 .blu-badge { vertical-align: 2px; margin-right: 4px; }
 @media (max-width: 680px) { .tl > div { grid-template-columns: 1fr; gap: 2px; } }
 
@@ -489,6 +490,13 @@ const download = async (url, fallback) => {
 const detailBits = (d) => Object.entries(d || {}).filter(([, v]) => Array.isArray(v) ? v.length : v != null && v !== "" && typeof v !== "object")
   .slice(0, 5).map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.slice(0, 6).join(", ") : v}`);
 const verdictBadge = (v) => `<span class="badge ${v === "malicious" ? "malicious" : v === "suspicious" ? "suspicious" : v === "clean" ? "clean" : ""}">${esc(cap(v))}</span>`;
+// The fused sample verdict as a header badge, falling back to the static risk word before it loads.
+function verdictBadge2(v, risk) {
+  if (!v) return `<span class="badge ${riskClass(risk)}">${riskWord(risk)}</span>`;
+  const cls = v.verdict === "malicious" ? "malicious" : v.verdict === "suspicious" ? "suspicious" : v.verdict === "clean" ? "clean" : "";
+  return `<span class="badge ${cls}" style="height:26px;font-size:12.5px">${esc(cap(v.verdict))}</span>`
+    + `<span class="small">score ${v.score}/100 · ${esc(v.confidence)} confidence</span>`;
+}
 
 // ============================================================ state
 let LAB = null;
@@ -675,10 +683,13 @@ async function viewCase(cid) {
   <div id="c-compare-box"></div>
   <div class="split">
     <div class="stack">
-      <div class="card flush">${samples.length ? `<table><thead><tr><th>Risk</th><th>File</th><th class="hide-sm">Type</th><th class="hide-sm">Runs</th><th></th></tr></thead><tbody>
-        ${samples.map((s) => `<tr class="link" data-href="#/case/${cid}/sample/${s.id}"><td>${riskBadge(s.risk)}</td>
+      ${d.verdict && d.verdict.verdict !== "unknown" ? `<div class="card ${d.verdict.verdict === "malicious" ? "verdict-mal" : "verdict-sus"}" style="margin-bottom:16px"><div class="row" style="gap:12px">
+        ${gauge(d.verdict.score, 54)}<div class="grow"><div class="row" style="gap:8px">${verdictBadge(d.verdict.verdict)}<b>Case verdict: ${esc(cap(d.verdict.verdict))}</b></div>
+        <div class="small">${d.verdict.families && d.verdict.families.length ? "Families: " + esc(d.verdict.families.join(", ")) + " · " : ""}highest score ${d.verdict.score}/100 across ${plural(samples.length, "sample")}</div></div></div></div>` : ""}
+      <div class="card flush">${samples.length ? `<table><thead><tr><th>Verdict</th><th>File</th><th class="hide-sm">Family</th><th class="hide-sm">Runs</th><th></th></tr></thead><tbody>
+        ${samples.map((s) => `<tr class="link" data-href="#/case/${cid}/sample/${s.id}"><td>${s.verdict ? verdictBadge(s.verdict.verdict) : riskBadge(s.risk)}</td>
           <td><div class="mono" style="font-size:13px;color:var(--text)">${esc(s.filename)}</div><div class="small">${esc(s.source || "")}</div></td>
-          <td class="small hide-sm">${esc(s.file_type || "")}</td><td class="hide-sm">${s.run_count || 0}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
+          <td class="small hide-sm">${s.verdict && s.verdict.family ? esc(s.verdict.family) : esc(s.file_type || "")}</td><td class="hide-sm">${s.run_count || 0}</td><td class="chev">›</td></tr>`).join("")}</tbody></table>`
         : `<div class="empty"><b>No samples yet</b>Use “Add samples” to upload a file or archive.</div>`}</div>
       <div class="card"><h3>Notes</h3><textarea id="c-notes" style="width:100%;min-height:110px" placeholder="Findings, hypotheses, next steps…" aria-label="Case notes">${esc(c.notes || "")}</textarea>
         <div class="row end" style="margin-top:10px"><span class="small" id="c-notes-st"></span><button id="c-notes-save">Save notes</button></div></div>
@@ -834,11 +845,13 @@ async function viewSample(cid, sid, tab, force) {
   cur = { view: "sample", cid, sid, tab };
   if (!same) {
     if (!force) loading();
-    const [d, st, det] = await Promise.all([api("/api/lab/case/" + cid), api(`/api/lab/sample/${sid}/static`), api(`/api/lab/sample/${sid}/detections`)]);
+    const [d, st, det, ver] = await Promise.all([api("/api/lab/case/" + cid), api(`/api/lab/sample/${sid}/static`),
+      api(`/api/lab/sample/${sid}/detections`), api(`/api/lab/sample/${sid}/verdict`)]);
     if (cur.view !== "sample" || cur.sid !== sid) return;
     const s = d.samples && d.samples.find((x) => x.id === sid);
     if (!s) return page(`<div class="empty"><b>Sample not found</b><a class="btn" href="#/case/${cid}">Back to case</a></div>`);
-    SAMPLE = { c: d.case, s, st: st && !st.error ? st : null, det: det && !det.error ? det : {}, run: force && SAMPLE ? SAMPLE.run : null };
+    SAMPLE = { c: d.case, s, st: st && !st.error ? st : null, det: det && !det.error ? det : {},
+      verdict: ver && !ver.error ? ver : null, run: force && SAMPLE ? SAMPLE.run : null };
   }
   renderSample(same || force);
 }
@@ -849,9 +862,9 @@ function renderSample(keepScroll) {
   const counts = { static: iocs, behavior: runs.length, intel: INTEL[sid] && INTEL[sid] !== "pending" ? INTEL[sid].summary.hits : 0 };
   page(`
   <nav class="crumbs"><a href="#/cases">Cases</a><span>/</span><a href="#/case/${cid}">${esc(c.name)}</a><span>/</span><b class="mono">${esc(s.filename)}</b></nav>
-  <div class="shead">${gauge(s.risk, 76)}
-    <div class="info"><div class="row" style="gap:8px"><span class="badge ${riskClass(s.risk)}">${riskWord(s.risk)}</span><span class="small">${esc(s.file_type || "")} · ${fmtSize(s.size)}</span></div>
-      <h1>${esc(s.filename)}</h1><div class="small">${esc(s.source || "")} · added ${fmtDate(s.added)}</div></div>
+  <div class="shead">${gauge(SAMPLE.verdict ? SAMPLE.verdict.score : s.risk, 76)}
+    <div class="info"><div class="row" style="gap:8px">${verdictBadge2(SAMPLE.verdict, s.risk)}<span class="small">${esc(s.file_type || "")} · ${fmtSize(s.size)}</span>${SAMPLE.verdict && SAMPLE.verdict.family ? `<span class="chip">family: ${esc(SAMPLE.verdict.family)}</span>` : ""}</div>
+      <h1>${esc(s.filename)}</h1><div class="small">${esc(s.source || "")} · added ${fmtDate(s.added)}${SAMPLE.verdict && SAMPLE.verdict.reasons && SAMPLE.verdict.reasons.length ? ` · ${esc(SAMPLE.verdict.reasons.slice(0, 3).join(" · "))}` : ""}</div></div>
     <div class="row"><button id="s-opensb" ${LAB && LAB.sandbox.available && !LAB.sandbox.busy ? "" : "disabled"} title="Open a hardened sandbox with this sample read-only on its desktop">Open in sandbox</button><a class="btn" href="${base}/intel">Threat intel</a>
       ${DETONATING[sid] ? `<a class="btn" href="${base}/behavior"><span class="spin"></span> Detonating</a>` : `<a class="btn ${LAB && LAB.sandbox.available ? "primary" : ""}" href="${base}/behavior">Detonate</a>`}</div></div>
   <nav class="tabs">${TABS.map(([k, l]) => `<a href="${base}${k === "overview" ? "" : "/" + k}" class="${k === tab ? "on" : ""}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}</a>`).join("")}</nav>
