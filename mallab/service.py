@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from . import (actors, archives, defender, diffing, fakenet, hostmon, intel, ioc_intel, netguard, sandbox,
-               signatures, static, tooling, verdict, yara_rules)
+               htmlreport, signatures, static, tooling, verdict, yara_rules)
 from .samples import SampleSource, sha256_of
 from .store import Store
 
@@ -1129,6 +1129,21 @@ class MalLab:
         out += ["### File hashes", "", "| File | SHA-256 |", "|---|---|"]
         out += [f"| {h['filename']} | `{h['sha256']}` |" for h in iocs["hashes"]]
         return "\n".join(out) + "\n"
+
+    def export_html_report(self, case_id: str) -> str:
+        """A polished, self-contained HTML report (prints to PDF): executive summary with the
+        verdict, per-sample findings, detections with ATT&CK, consolidated IOCs, recommendations."""
+        detail = self.case_detail(case_id)
+        if not detail:
+            raise ValueError("no such case")
+        case, samples = detail["case"], detail["samples"]
+        per_sample = []
+        for s in samples:
+            runs = [self.dynamic_report(s["id"], r["id"]) for r in self.store.list_runs(s["id"])]
+            per_sample.append({"sample": s, "verdict": self.sample_verdict(s["id"]),
+                               "static": self.static_report(s["id"]), "detections": self.detections(s["id"]),
+                               "runs": [r for r in runs if r]})
+        return htmlreport.build(case, samples, per_sample, self.case_iocs(case_id), detail.get("verdict") or {})
 
     def case_detail(self, case_id: str) -> dict | None:
         case = self.store.get_case(case_id)

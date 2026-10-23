@@ -676,7 +676,7 @@ async function viewCase(cid) {
     <div class="row"><button id="c-iocs" ${samples.length ? "" : "disabled"}>Copy IOCs</button>
       <select id="c-export" aria-label="Export IOCs" ${samples.length ? "" : "disabled"}><option value="">Export IOCs…</option><option value="csv">CSV</option><option value="stix">STIX 2.1 (MISP / OpenCTI)</option><option value="txt">Defanged text</option></select>
       <button id="c-compare" ${samples.length > 1 ? "" : "disabled"}>Compare</button>
-      <button id="c-report" ${samples.length ? "" : "disabled"}>Download report</button><button class="ghost red" id="c-del">Delete</button></div></div>
+      <select id="c-report" aria-label="Report" ${samples.length ? "" : "disabled"}><option value="">Report…</option><option value="html-view">HTML — view</option><option value="html">HTML — download</option><option value="md">Markdown</option></select><button class="ghost red" id="c-del">Delete</button></div></div>
   <div class="row" style="margin-bottom:16px;gap:8px"><button class="sm" id="c-attck" ${samples.length ? "" : "disabled"}>ATT&amp;CK matrix</button>
     <button class="sm" id="c-timeline" ${samples.length ? "" : "disabled"}>Timeline</button>
     <button class="sm" id="c-enrich" ${samples.length ? "" : "disabled"} title="Look up the case's IPs, domains and URLs in free intel sources">Enrich IOCs</button></div>
@@ -754,10 +754,14 @@ async function viewCase(cid) {
     if (!await ask({ title: `Delete “${c.name}”?`, body: `<p>This removes the case and its ${plural(samples.length, "sample")}, runs and notes. It can't be undone.</p>`, ok: "Delete case", danger: true })) return;
     await api(`/api/lab/case/${cid}/delete`, {}); toast("Case deleted"); location.hash = "#/cases";
   };
-  $("c-report").onclick = async () => {
-    const r = await fetch(`/api/lab/case/${cid}/report`); if (!r.ok) return toast("Couldn't build the report", true);
+  $("c-report").onchange = async () => {
+    const kind = $("c-report").value; $("c-report").value = ""; if (!kind) return;
+    const slug = (c.name || "case").replace(/[^A-Za-z0-9._-]+/g, "_");
+    if (kind === "html-view") return window.open(`/api/lab/case/${cid}/report.html?inline=1`, "_blank", "noopener");
+    const url = kind === "md" ? `/api/lab/case/${cid}/report` : `/api/lab/case/${cid}/report.html`;
+    const r = await fetch(url); if (!r.ok) return toast("Couldn't build the report", true);
     const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob());
-    a.download = (c.name || "case").replace(/[^A-Za-z0-9._-]+/g, "_") + "-report.md"; a.click(); URL.revokeObjectURL(a.href);
+    a.download = slug + (kind === "md" ? "-report.md" : "-report.html"); a.click(); URL.revokeObjectURL(a.href);
   };
   $("c-iocs").onclick = async () => {
     const r = await api(`/api/lab/case/${cid}/iocs`); if (r.error) return toast(r.error, true);

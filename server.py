@@ -24,7 +24,8 @@ from urllib.parse import unquote
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
+from starlette.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
+                                  RedirectResponse, StreamingResponse)
 from starlette.routing import Route
 
 from mallab import MalLab, fakenet
@@ -218,6 +219,17 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         name = re.sub(r"[^A-Za-z0-9._-]+", "_", case["name"] if case else cid).strip("_") or "case"
         return PlainTextResponse(md, media_type="text/markdown; charset=utf-8",
                                  headers={"Content-Disposition": f'attachment; filename="{name}-report.md"'})
+
+    async def case_html_report(request):
+        cid = request.path_params["cid"]
+        try:
+            html = await asyncio.to_thread(lab.export_html_report, cid)
+        except ValueError as e:
+            return _err(e, 404)
+        case = lab.store.get_case(cid)
+        name = re.sub(r"[^A-Za-z0-9._-]+", "_", case["name"] if case else cid).strip("_") or "case"
+        disp = "inline" if request.query_params.get("inline") else "attachment"
+        return HTMLResponse(html, headers={"Content-Disposition": f'{disp}; filename="{name}-report.html"'})
 
     async def case_ioc_export(request):
         cid = request.path_params["cid"]
@@ -530,6 +542,7 @@ def build_app(lab: MalLab, hub: Hub, ui_file: Path = UI_FILE) -> Starlette:
         Route("/api/lab/case/{cid}/iocs", case_iocs),
         Route("/api/lab/case/{cid}/compare", case_compare),
         Route("/api/lab/case/{cid}/report", case_report),
+        Route("/api/lab/case/{cid}/report.html", case_html_report),
         Route("/api/lab/case/{cid}/iocs/export", case_ioc_export),
         Route("/api/lab/sample/{sid}/annotate", annotate, methods=["POST"]),
         Route("/api/lab/sample/{sid}/related", related),
